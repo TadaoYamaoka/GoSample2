@@ -8,7 +8,7 @@ const double C = 1.0; // UCB定数
 const int THR = 20; // ノード展開の閾値
 int PLAYOUT_MAX = 2000;
 
-const int NODE_MAX = 100000;
+const int NODE_MAX = 10000;
 UCTNode node_pool[NODE_MAX]; // ノードプール(高速化のため動的に確保しない)
 UCTNode* p_node_pool;
 
@@ -22,7 +22,7 @@ UCTNode* create_root_node()
 
 UCTNode* create_node(const XY xy)
 {
-	if (p_node_pool + 1 >= node_pool + NODE_MAX)
+	if (p_node_pool - node_pool >= NODE_MAX - 1)
 	{
 		return nullptr;
 	}
@@ -323,5 +323,5 @@ XY UCTSample::select_move(Board& board, Color color)
 
 int UCTSample::get_created_node()
 {
-	return (int)(p_node_pool - node_pool);
+	return (int)(p_node_pool - node_pool + 1);
 }
