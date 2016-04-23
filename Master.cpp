@@ -327,12 +327,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						printf("%d: playout num = %d, created node num = %5d, elapse time = %4d ms\n", color, root->playout_num_sum, player->get_created_node(), elapseTime);
 					}
 
-					if (xy == PASS && pre_xy == PASS)
-					{
-						// 終局
-						break;
-					}
-
 					pre_xy = xy;
 					color = opponent(color);
 
@@ -347,6 +341,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						result_num = root->child_num;
 					}
 					InvalidateRect(hWnd, NULL, FALSE);
+
+					if (xy == PASS && pre_xy == PASS)
+					{
+						// 終局
+						break;
+					}
 
 					// メッセージ処理
 					MSG msg;
