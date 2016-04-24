@@ -27,9 +27,6 @@
     <ClCompile Include="..\Human.cpp">
       <Filter>ソース ファイル\target</Filter>
     </ClCompile>
-    <ClCompile Include="..\Random.cpp">
-      <Filter>ソース ファイル\target</Filter>
-    </ClCompile>
     <ClCompile Include="..\UCTSample.cpp">
       <Filter>ソース ファイル\target</Filter>
     </ClCompile>
