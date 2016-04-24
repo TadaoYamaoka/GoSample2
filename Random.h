@@ -1,5 +1,6 @@
 #pragma once
 #include <chrono>
+#include <thread>
 
 #ifndef _WIN64
 #include <stdlib.h>
@@ -8,7 +9,7 @@ class Random
 {
 public:
 	Random() {
-		srand(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
+		srand(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());
 	}
 
 	int random()
@@ -25,7 +26,7 @@ class Random
 	uint64_t xorshift64star_x; // The state must be seeded with a nonzero value.
 public:
 	Random() {
-		xorshift64star_x = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+		xorshift64star_x = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 	}
 
 	uint64_t random() {
