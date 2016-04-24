@@ -63,20 +63,27 @@ bool UCTNode::expand_node(const Board& board)
 Color end_game(const Board& board)
 {
 	// 中国ルールで数える
-	int score = 0;
-	// 石の数
-	int stone_num[] = { 0, 0, 0, 0 };
+	int score = board.stone_num[BLACK] - board.stone_num[WHITE];
+	int eye_num = BOARD_STONE_MAX - (board.stone_num[BLACK] + board.stone_num[WHITE]);
+	double final_score = score - KOMI;
+
+	// 眼を数えなくても勝敗が決まる場合
+	if (final_score - eye_num > 0)
+	{
+		// 眼が全て白だとしても黒の勝ち
+		return BLACK;
+	}
+	else if (final_score + eye_num < 0)
+	{
+		// 眼が全て黒だとしても白の勝ち
+		return WHITE;
+	}
 
 	//debug_print_board(board);
 
+	// 眼を数える
 	for (XY xy = BOARD_WIDTH + 1; xy < BOARD_MAX - BOARD_WIDTH; xy++)
 	{
-		Color c = board[xy];
-		stone_num[c]++;
-		if (c != EMPTY)
-		{
-			continue;
-		}
 		int mk[] = { 0, 0, 0, 0 }; // 各色の4方向の石の数
 		for (int d : DIR4)
 		{
@@ -94,8 +101,7 @@ Color end_game(const Board& board)
 		}
 	}
 
-	score = stone_num[BLACK] - stone_num[WHITE];
-	double final_score = score - KOMI;
+	final_score = score - KOMI;
 
 	if (final_score > 0) {
 		return BLACK;

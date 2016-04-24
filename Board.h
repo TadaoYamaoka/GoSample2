@@ -5,6 +5,7 @@
 
 extern int BOARD_SIZE;
 extern int BOARD_WIDTH;
+extern int BOARD_STONE_MAX;
 extern int BOARD_MAX;
 const int BOARD_SIZE_MAX = 19;
 const int GROUP_SIZE_MAX = BOARD_SIZE_MAX * BOARD_SIZE_MAX / 2;
@@ -190,6 +191,7 @@ public:
 
 class Board
 {
+public:
 	// î’ñ (òAî‘çÜÇï€éù)
 	GroupIndex board[BOARD_BYTE_MAX];
 
@@ -198,8 +200,10 @@ class Board
 	int group_num;
 	BitBoard group_unusedflg[GROUP_SIZE_MAX / BIT + 1];
 
-public:
 	XY ko;
+
+	// êŒÇÃêî
+	int stone_num[3];
 
 	Board() {}
 	Board(const int size) {
@@ -210,10 +214,12 @@ public:
 	{
 		BOARD_SIZE = size;
 		BOARD_WIDTH = BOARD_SIZE + 1;
+		BOARD_STONE_MAX = BOARD_SIZE * BOARD_SIZE;
 		BOARD_MAX = BOARD_WIDTH * (BOARD_SIZE + 2);
 		memset(board, G_NONE, BOARD_MAX);
 		memset(board, G_OFFBOARD, BOARD_WIDTH);
 		memset(board + BOARD_WIDTH * (BOARD_SIZE + 1), G_OFFBOARD, BOARD_WIDTH);
+		stone_num[BLACK] = stone_num[WHITE] = 0;
 		for (int y = 1; y <= BOARD_SIZE; y++)
 		{
 			board[BOARD_WIDTH * y] = G_OFFBOARD;
