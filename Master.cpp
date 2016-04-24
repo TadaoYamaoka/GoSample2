@@ -5,17 +5,17 @@
 #include <time.h>
 #include "Random.h"
 #include "UCTSample.h"
-//#include "UCTSample2.h"
+#include "UCTParallel.h"
 #include "Human.h"
 
 using namespace std;
 
 // プレイヤー一覧
-Player* playerList[] = {new UCTSample(), /*new UCTSample2(), */new Human()};
+Player* playerList[] = {new UCTSample(), new UCTParallel(), new Human()};
 
 static bool isPalying = false;
 static Board board;
-static Player* players[2] = { playerList[0], playerList[0] };
+static Player* players[2] = { playerList[1], playerList[1] };
 Player* current_player;
 UCTNode result[BOARD_SIZE_MAX * BOARD_SIZE_MAX + 1];
 int result_num = 0;
@@ -320,18 +320,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					record[record_num++] = xy; // 棋譜追加
 
 					// プレイアウト数と時間を表示
-					if (typeid(*current_player) == typeid(UCTSample)/* || typeid(*current_player) == typeid(UCTSample2)*/)
+					if (dynamic_cast<UCTSample*>(current_player) != NULL)
 					{
 						UCTSample* player = (UCTSample*)current_player;
 						UCTNode* root = player->root;
-						printf("%d: playout num = %d, created node num = %5d, elapse time = %4d ms\n", color, root->playout_num_sum, player->get_created_node(), elapseTime);
+						printf("%d: playout num = %d, created node num = %5d, elapse time = %4d ms\n", color, root->playout_num_sum, player->get_created_node_cnt(), elapseTime);
 					}
 
-					pre_xy = xy;
-					color = opponent(color);
-
 					// 描画更新
-					if (typeid(*current_player) == typeid(UCTSample)/* || typeid(*current_player) == typeid(UCTSample2)*/)
+					if (dynamic_cast<UCTSample*>(current_player) != NULL)
 					{
 						UCTNode* root = ((UCTSample*)current_player)->root;
 						for (int i = 0; i < root->child_num; i++)
@@ -347,6 +344,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						// 終局
 						break;
 					}
+
+					pre_xy = xy;
+					color = opponent(color);
 
 					// メッセージ処理
 					MSG msg;
@@ -696,7 +696,7 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
 			}
 
 			// UCTの勝率を保存
-			if (typeid(*current_player) == typeid(UCTSample)/* || typeid(*current_player) == typeid(UCTSample2)*/)
+			if (dynamic_cast<UCTSample*>(current_player) != NULL)
 			{
 				UCTNode* root = ((UCTSample*)current_player)->root;
 				for (int i = 0; i < root->child_num; i++)

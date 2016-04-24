@@ -33,5 +33,8 @@
     <ClCompile Include="..\UCTSample.cpp">
       <Filter>ソース ファイル\target</Filter>
     </ClCompile>
+    <ClCompile Include="..\UCTParallel.cpp">
+      <Filter>ソース ファイル\target</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

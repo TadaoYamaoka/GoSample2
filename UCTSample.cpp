@@ -3,59 +3,71 @@
 #include "UCTSample.h"
 #include "Debug.h"
 
-const int FPU = 10; // First Play Urgency
-const double C = 1.0; // UCB定数
-const int THR = 20; // ノード展開の閾値
 int PLAYOUT_MAX = 2000;
 
-const int NODE_MAX = 10000;
+const int NODE_MAX = 300000;
 UCTNode node_pool[NODE_MAX]; // ノードプール(高速化のため動的に確保しない)
-UCTNode* p_node_pool;
+volatile long node_pool_cnt = 0;
 
 UCTNode* create_root_node()
 {
-	p_node_pool = node_pool;
-	p_node_pool->playout_num_sum = 0;
-	p_node_pool->child_num = 0;
-	return p_node_pool;
+	node_pool_cnt = 1; // rootノード作成時はロック不要
+	node_pool[0].playout_num_sum = 0;
+	node_pool[0].child_num = 0;
+	return node_pool;
 }
 
-UCTNode* create_node(const XY xy)
+UCTNode* create_child_node(const int size)
 {
-	if (p_node_pool - node_pool >= NODE_MAX - 1)
+	if (node_pool_cnt + size > NODE_MAX)
 	{
 		return nullptr;
 	}
-	p_node_pool++;
-	p_node_pool->xy = xy;
-	p_node_pool->playout_num = 0;
-	p_node_pool->playout_num_sum = 0;
-	p_node_pool->win_num = 0;
-	p_node_pool->child_num = 0;
-	return p_node_pool;
+
+	// アトミックに加算
+	long prev_note_pool_cnt = _InterlockedExchangeAdd(&node_pool_cnt, size);
+
+	if (node_pool_cnt > NODE_MAX)
+	{
+		return nullptr;
+	}
+
+	return node_pool + prev_note_pool_cnt;
 }
 
 // ノード展開
 bool UCTNode::expand_node(const Board& board)
 {
+	// ノード数をカウント
+	XY empty_xy[BOARD_SIZE_MAX * BOARD_SIZE_MAX + 1];
 	for (XY xy = BOARD_WIDTH + 1; xy < BOARD_MAX - BOARD_WIDTH; xy++)
 	{
 		if (board.is_empty(xy))
 		{
-			create_node(xy);
-			child_num++;
+			empty_xy[child_num++] = xy;
 		}
 	}
 	// PASSを追加
-	child = create_node(PASS);
+	empty_xy[child_num++] = PASS;
+
+	child = create_child_node(child_num);
+
 	if (child == nullptr)
 	{
 		child_num = 0;
 		return false;
 	}
-	child_num++;
 
-	child -= (child_num - 1); // 先頭のポインタ
+	// ノードの値を設定
+	for (int i = 0; i < child_num; i++)
+	{
+		child[i].xy = empty_xy[i];
+		child[i].playout_num = 0;
+		child[i].playout_num_sum = 0;
+		child[i].win_num = 0;
+		child[i].child_num = 0;
+	}
+
 	return true;
 }
 
@@ -112,7 +124,7 @@ Color end_game(const Board& board)
 }
 
 // プレイアウト
-int playout(Board& board, UCTNode* node, const Color color)
+int playout(Board& board, const Color color)
 {
 	int possibles[BOARD_SIZE_MAX * BOARD_SIZE_MAX]; // 動的に確保しない
 
@@ -235,19 +247,19 @@ int search_uct(Board& board, const Color color, UCTNode* node)
 	// 閾値以下の場合プレイアウト
 	if (selected_node->playout_num < THR)
 	{
-		win = 1 - playout(board, selected_node, opponent(color));
+		win = 1 - playout(board, opponent(color));
 	}
 	else {
-		// ノードを展開
 		if (selected_node->child_num == 0)
 		{
+			// ノードを展開
 			if (selected_node->expand_node(board))
 			{
 				win = 1 - search_uct(board, opponent(color), selected_node);
 			}
 			else {
 				// ノードプール不足
-				win = 1 - playout(board, selected_node, opponent(color));
+				win = 1 - playout(board, opponent(color));
 			}
 		}
 		else {
@@ -327,7 +339,7 @@ XY UCTSample::select_move(Board& board, Color color)
 	return best_move->xy;
 }
 
-int UCTSample::get_created_node()
+int UCTSample::get_created_node_cnt()
 {
-	return (int)(p_node_pool - node_pool + 1);
+	return node_pool_cnt;
 }

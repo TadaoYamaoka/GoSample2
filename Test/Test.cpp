@@ -4,6 +4,7 @@
 #include "../Random.h"
 #include "../Board.h"
 #include "../UCTSample.h"
+#include "../UCTParallel.h"
 
 void init_board(Board& board, Color* test_board, const int boardsize)
 {
@@ -55,7 +56,7 @@ void test_001()
 	init_board(board, test_board, 9);
 	debug_print_board(board);
 
-	UCTSample player;
+	UCTParallel player;
 	XY xy = player.select_move(board, BLACK);
 
 	print_child(player.root);
@@ -81,7 +82,7 @@ void test_002() {
 	init_board(board, test_board, 9);
 	debug_print_board(board);
 
-	UCTSample player;
+	UCTParallel player;
 	XY xy = player.select_move(board, WHITE);
 
 	print_child(player.root);

@@ -147,6 +147,7 @@
     <ClInclude Include="Human.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Random.h" />
+    <ClInclude Include="UCTParallel.h" />
     <ClInclude Include="UCTSample.h" />
   </ItemGroup>
   <ItemGroup>
@@ -154,6 +155,7 @@
     <ClCompile Include="Human.cpp" />
     <ClCompile Include="Master.cpp" />
     <ClCompile Include="Random.cpp" />
+    <ClCompile Include="UCTParallel.cpp" />
     <ClCompile Include="UCTSample.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
