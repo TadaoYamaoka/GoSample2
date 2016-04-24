@@ -50,9 +50,6 @@
     <ClCompile Include="UCTSample.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Random.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
     <ClCompile Include="UCTParallel.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>

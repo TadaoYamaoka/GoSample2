@@ -154,7 +154,6 @@
     <ClCompile Include="Board.cpp" />
     <ClCompile Include="Human.cpp" />
     <ClCompile Include="Master.cpp" />
-    <ClCompile Include="Random.cpp" />
     <ClCompile Include="UCTParallel.cpp" />
     <ClCompile Include="UCTSample.cpp" />
   </ItemGroup>
