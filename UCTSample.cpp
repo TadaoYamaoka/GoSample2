@@ -19,11 +19,6 @@ UCTNode* create_root_node()
 
 UCTNode* create_child_node(const int size)
 {
-	if (node_pool_cnt + size > NODE_MAX)
-	{
-		return nullptr;
-	}
-
 	// アトミックに加算
 	long prev_note_pool_cnt = _InterlockedExchangeAdd(&node_pool_cnt, size);
 
