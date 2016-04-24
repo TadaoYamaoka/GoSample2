@@ -3,7 +3,6 @@
 #include <CommCtrl.h>
 #include <typeinfo>
 #include <time.h>
-#include "Random.h"
 #include "UCTSample.h"
 #include "UCTParallel.h"
 #include "Human.h"
@@ -62,7 +61,6 @@ void print_sfg();
 #ifndef TEST
 int wmain(int argc, wchar_t* argv[]) {
 	::hInstance = GetModuleHandle(NULL);
-	srandom(time(NULL));
 
 	// ƒIƒvƒVƒ‡ƒ“
 	for (int i = 0; i < argc; i++)

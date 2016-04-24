@@ -1,4 +1,5 @@
 #include <math.h>
+#include <thread>
 #include "Random.h"
 #include "UCTSample.h"
 #include "Debug.h"
@@ -8,6 +9,8 @@ int PLAYOUT_MAX = 2000;
 const int NODE_MAX = 300000;
 UCTNode node_pool[NODE_MAX]; // ノードプール(高速化のため動的に確保しない)
 volatile long node_pool_cnt = 0;
+
+thread_local Random random;
 
 UCTNode* create_root_node()
 {
@@ -151,7 +154,7 @@ int playout(Board& board, const Color color)
 			}
 			else {
 				// ランダムで手を選ぶ
-				selected_i = random() % possibles_num;
+				selected_i = random.random() % possibles_num;
 				selected_xy = possibles[selected_i];
 			}
 
@@ -204,7 +207,7 @@ UCTNode* select_node_with_ucb(UCTNode* node)
 		if (child->playout_num == 0)
 		{
 			// 未実行
-			ucb = FPU + double(random()) * FPU / RANDOM_MAX;
+			ucb = FPU + double(random.random()) * FPU / RANDOM_MAX;
 		}
 		else {
 			ucb = double(child->win_num) / child->playout_num + C * sqrt(log(node->playout_num_sum) / child->playout_num);

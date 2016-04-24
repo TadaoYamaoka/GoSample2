@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <time.h>
 #include "../Debug.h"
-#include "../Random.h"
 #include "../Board.h"
 #include "../UCTSample.h"
 #include "../UCTParallel.h"
@@ -93,7 +92,6 @@ void test_002() {
 
 int main()
 {
-	srandom(time(NULL));
 	test_001();
 	test_002();
 	return 0;
