@@ -117,13 +117,8 @@ public:
 	int stone_num;
 	int liberty_num;
 
-	// 連の一部か
-	bool hit_stones(const XY xy) {
-		return stone[xy] == color;
-	}
-
 	// 呼吸点が一致するか
-	bool hit_liberties(const XY xy) {
+	bool hit_liberties(const XY xy) const {
 		return bit_test(&liberty_bitboard[xy / BIT], xy % BIT);
 	}
 
@@ -255,6 +250,7 @@ public:
 	}
 
 	MoveResult move(const XY xy, const Color color, const bool fill_eye_err = true);
+	MoveResult is_legal(const XY xy, const Color color, const bool fill_eye_err = true) const;
 
 	int add_group(const XY xy, const Color color, const XY around_liberty[4]) {
 		// 未使用のインデックスを探す

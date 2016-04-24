@@ -38,19 +38,11 @@ UCTNode* create_child_node(const int size)
 // ノード展開
 bool UCTNode::expand_node(const Board& board)
 {
-	// ノード数をカウント
-	XY empty_xy[BOARD_SIZE_MAX * BOARD_SIZE_MAX + 1];
-	for (XY xy = BOARD_WIDTH + 1; xy < BOARD_MAX - BOARD_WIDTH; xy++)
-	{
-		if (board.is_empty(xy))
-		{
-			empty_xy[child_num++] = xy;
-		}
-	}
-	// PASSを追加
-	empty_xy[child_num++] = PASS;
+	// 空白の数をカウント
+	child_num = BOARD_STONE_MAX - (board.stone_num[BLACK] + board.stone_num[WHITE]);
 
-	child = create_child_node(child_num);
+	// ノードを確保
+	child = create_child_node(child_num + 1);
 
 	if (child == nullptr)
 	{
@@ -59,14 +51,25 @@ bool UCTNode::expand_node(const Board& board)
 	}
 
 	// ノードの値を設定
-	for (int i = 0; i < child_num; i++)
+	int i = 0;
+	for (XY xy = BOARD_WIDTH + 1; xy < BOARD_MAX - BOARD_WIDTH; xy++)
 	{
-		child[i].xy = empty_xy[i];
-		child[i].playout_num = 0;
-		child[i].playout_num_sum = 0;
-		child[i].win_num = 0;
-		child[i].child_num = 0;
+		if (board.is_empty(xy))
+		{
+			child[i].xy = xy;
+			child[i].playout_num = 0;
+			child[i].playout_num_sum = 0;
+			child[i].win_num = 0;
+			child[i].child_num = 0;
+			i++;
+		}
 	}
+	// PASSを追加
+	child[i].xy = PASS;
+	child[i].playout_num = 0;
+	child[i].playout_num_sum = 0;
+	child[i].win_num = 0;
+	child[i].child_num = 0;
 
 	return true;
 }

@@ -54,11 +54,44 @@ void search_uct_root(Board& board, const Color color, UCTNode* node, const std::
 	_InterlockedIncrement(&node->playout_num_sum);
 }
 
+void expand_root_node(const Board& board, const Color color, UCTNode* root)
+{
+	// 合法手の数をカウント
+	XY legal_xy[BOARD_SIZE_MAX * BOARD_SIZE_MAX + 1];
+	for (XY xy = BOARD_WIDTH + 1; xy < BOARD_MAX - BOARD_WIDTH; xy++)
+	{
+		if (board.is_empty(xy))
+		{
+			if (board.is_legal(xy, color) == SUCCESS)
+			{
+				legal_xy[root->child_num++] = xy;
+			}
+		}
+	}
+	// PASSを追加
+	legal_xy[root->child_num++] = PASS;
+
+	// ノードを確保
+	root->child = create_child_node(root->child_num);
+
+	// ノードの値を設定
+	for (int i = 0; i < root->child_num; i++)
+	{
+		root->child[i].xy = legal_xy[i];
+		root->child[i].playout_num = 0;
+		root->child[i].playout_num_sum = 0;
+		root->child[i].win_num = 0;
+		root->child[i].child_num = 0;
+	}
+}
+
 XY UCTParallel::select_move(Board& board, Color color)
 {
 	UCTNode* root = create_root_node();
 	this->root = root;
-	root->expand_node(board);
+
+	// ノードを展開(合法手のみ)
+	expand_root_node(board, color, root);
 
 	// root並列化
 	std::thread th[THREAD_NUM];

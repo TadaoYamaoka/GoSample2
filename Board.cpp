@@ -194,3 +194,78 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 
 	return SUCCESS;
 }
+
+MoveResult Board::is_legal(const XY xy, const Color color, const bool fill_eye_err) const
+{
+	// 周囲4方向の連
+	int capture_num = 0;
+
+	// 呼吸点が一致する連を取得
+	for (int i = 0, hit_num = 0; hit_num < group_num; i++)
+	{
+		if (bit_test(&group_unusedflg[i / BIT], i % BIT) == 0)
+		{
+			hit_num++;
+			if (group[i].hit_liberties(xy))
+			{
+				if (group[i].color == color)
+				{
+				}
+				else {
+					// 取ることができるか
+					if (group[i].liberty_num == 1)
+					{
+						capture_num += group[i].stone_num;
+					}
+				}
+			}
+		}
+	}
+
+	int offboard_num = 0;
+	int empty_num = 0;
+	int alive_num = 0;
+	// 周囲4方向の空白
+	XY around_liberty[4] = { 0 };
+	for (int i = 0; i < 4; i++)
+	{
+		XY xyd = xy + DIR4[i];
+
+		if (board[xyd] == G_OFFBOARD)
+		{
+			offboard_num++;
+			continue;
+		}
+
+		if (board[xyd] == G_NONE)
+		{
+			empty_num++;
+			around_liberty[i] = 1;
+			continue;
+		}
+
+		// 隣接する自分の色の連の呼吸点がなくならないか
+		if (group[board[xyd]].color == color && group[board[xyd]].liberty_num >= 2)
+		{
+			alive_num++;
+		}
+	}
+
+	// 自殺手
+	if (capture_num == 0 && empty_num == 0 && alive_num == 0)
+	{
+		return ILLIGAL;
+	}
+	// コウ
+	if (xy == ko)
+	{
+		return KO;
+	}
+	// 眼
+	if (offboard_num + alive_num == 4 && fill_eye_err)
+	{
+		return EYE;
+	}
+
+	return SUCCESS;
+}
