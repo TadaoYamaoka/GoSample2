@@ -254,7 +254,7 @@ int search_uct(Board& board, const Color color, UCTNode* node)
 		if (selected_node->child_num == 0)
 		{
 			// ƒm[ƒh‚ð“WŠJ
-			if (selected_node->expand_node(board))
+			if (selected_node->playout_num == THR && selected_node->expand_node(board))
 			{
 				win = 1 - search_uct(board, opponent(color), selected_node);
 			}
