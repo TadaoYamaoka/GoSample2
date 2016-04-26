@@ -46,8 +46,11 @@ int UCTSaveAtari::get_atari_save(const Board& board, const Color color, BitBoard
 					const Group* group = board.get_group(xyd);
 					if (group->color == color)
 					{
-						// 連結後の呼吸点
-						liberty += group->liberty_num - 1;
+						if (board.board[xyd] != i)
+						{
+							// 連結後の呼吸点
+							liberty += group->liberty_num - 1;
+						}
 					}
 					else
 					{
@@ -63,24 +66,24 @@ int UCTSaveAtari::get_atari_save(const Board& board, const Color color, BitBoard
 					// アタリを助けた後にも呼吸点が2以上ある
 					atari_save.bit_test_and_set(xy);
 				}
-			}
 
-			// 隣接する連の呼吸点が1の場合助けることができる
-			GroupIndex group_idx_tmp = 0;
-			for (int j = 0; j < board.group[i].adjacent.get_part_size(); j++, group_idx_tmp += BIT)
-			{
-				BitBoardPart adjacent_bitborad = board.group[i].adjacent.get_bitboard_part(j);
-				unsigned long idx;
-				while (bit_scan_forward(&idx, adjacent_bitborad))
+				// 隣接する連の呼吸点が1の場合助けることができる
+				GroupIndex group_idx_tmp = 0;
+				for (int j = 0; j < board.group[i].adjacent.get_part_size(); j++, group_idx_tmp += BIT)
 				{
-					GroupIndex group_idx = group_idx_tmp + idx;
-					if (board.group[group_idx].liberty_num == 1)
+					BitBoardPart adjacent_bitborad = board.group[i].adjacent.get_bitboard_part(j);
+					unsigned long idx;
+					while (bit_scan_forward(&idx, adjacent_bitborad))
 					{
-						// 呼吸点の場所
-						atari_save.bit_test_and_set(board.group[group_idx].get_first_liberty());
-					}
+						GroupIndex group_idx = group_idx_tmp + idx;
+						if (board.group[group_idx].liberty_num == 1)
+						{
+							// 呼吸点の場所
+							atari_save.bit_test_and_set(board.group[group_idx].get_first_liberty());
+						}
 
-					bit_test_and_reset(&adjacent_bitborad, idx);
+						bit_test_and_reset(&adjacent_bitborad, idx);
+					}
 				}
 			}
 		}

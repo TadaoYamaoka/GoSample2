@@ -182,7 +182,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 			{
 				GroupIndex idx = idx_offset + idx_tmp;
 				Group& adjacent_group = group[idx];
-				adjacent_group.adjacent.bit_test_and_reset(idx);
+				adjacent_group.adjacent.bit_test_and_reset(around_group_capture[i]);
 
 				remove.adjacent.bit_test_and_reset(j, idx_tmp);
 			}
@@ -199,7 +199,10 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 		group[around_group_oponnent[i]].remove_liberty(xy);
 
 		// 隣接する敵の連番号を追加
-		group[board[xy]].adjacent.bit_test_and_set(i);
+		group[board[xy]].adjacent.bit_test_and_set(around_group_oponnent[i]);
+
+		// 敵の連にも自分を隣接する連として追加
+		group[around_group_oponnent[i]].adjacent.bit_test_and_set(board[xy]);
 	}
 
 	// コウ
