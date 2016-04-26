@@ -125,19 +125,19 @@ public:
 		memset(bitboard, 0, sizeof(bitboard));
 	}
 
-	unsigned char bit_test(const int i) const {
+	unsigned char bit_test(const short i) const {
 		return ::bit_test(&bitboard[i / BIT], i % BIT);
 	}
 
-	unsigned char bit_test_and_set(const int i) {
+	unsigned char bit_test_and_set(const short i) {
 		return ::bit_test_and_set(&bitboard[i / BIT], i % BIT);
 	}
 
-	unsigned char bit_test_and_reset(const int i) {
+	unsigned char bit_test_and_reset(const short i) {
 		return ::bit_test_and_reset(&bitboard[i / BIT], i % BIT);
 	}
 
-	unsigned char bit_test_and_reset(const int n, const int i) {
+	unsigned char bit_test_and_reset(const int n, const short i) {
 		return ::bit_test_and_reset(&bitboard[n], i);
 	}
 
