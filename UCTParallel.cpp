@@ -1,16 +1,12 @@
 #include <future>
-#include <map>
 #include "UCTParallel.h"
 
 const int THREAD_NUM = 8; // 論理コア数
 
 extern UCTNode* create_root_node();
 extern UCTNode* create_child_node(const int size);
-extern UCTNode* select_node_with_ucb(UCTNode* node);
-extern int search_uct(Board& board, const Color color, UCTNode* node);
-extern int playout(Board& board, const Color color);
 
-void search_uct_root(Board& board, const Color color, UCTNode* node, const std::map<UCTNode*, UCTNode*>& copynodemap)
+void UCTParallel::search_uct_root(Board& board, const Color color, UCTNode* node, const std::map<UCTNode*, UCTNode*>& copynodemap)
 {
 	// UCBからプレイアウトする手を選択
 	// rootノードはアトミックに更新するためUCB計算ではロックしない
@@ -54,7 +50,7 @@ void search_uct_root(Board& board, const Color color, UCTNode* node, const std::
 	_InterlockedIncrement(&node->playout_num_sum);
 }
 
-void expand_root_node(const Board& board, const Color color, UCTNode* root)
+void UCTParallel::expand_root_node(const Board& board, const Color color, UCTNode* root)
 {
 	// 合法手の数をカウント
 	XY legal_xy[BOARD_SIZE_MAX * BOARD_SIZE_MAX + 1];

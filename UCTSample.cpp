@@ -37,10 +37,10 @@ UCTNode* create_child_node(const int size)
 bool UCTNode::expand_node(const Board& board)
 {
 	// 空白の数をカウント
-	child_num = BOARD_STONE_MAX - (board.stone_num[BLACK] + board.stone_num[WHITE]);
+	child_num = BOARD_STONE_MAX - (board.stone_num[BLACK] + board.stone_num[WHITE]) + 1;
 
 	// ノードを確保
-	child = create_child_node(child_num + 1);
+	child = create_child_node(child_num);
 
 	if (child == nullptr)
 	{
@@ -73,7 +73,7 @@ bool UCTNode::expand_node(const Board& board)
 }
 
 // 終局 勝敗を返す
-Color end_game(const Board& board)
+Color UCTSample::end_game(const Board& board)
 {
 	// 中国ルールで数える
 	int score = board.stone_num[BLACK] - board.stone_num[WHITE];
@@ -125,7 +125,7 @@ Color end_game(const Board& board)
 }
 
 // プレイアウト
-int playout(Board& board, const Color color)
+int UCTSample::playout(Board& board, const Color color)
 {
 	int possibles[BOARD_SIZE_MAX * BOARD_SIZE_MAX]; // 動的に確保しない
 
@@ -196,7 +196,7 @@ int playout(Board& board, const Color color)
 }
 
 // UCBからプレイアウトする手を選択
-UCTNode* select_node_with_ucb(UCTNode* node)
+UCTNode* UCTSample::select_node_with_ucb(UCTNode* node)
 {
 	UCTNode* selected_node;
 	double max_ucb = -999;
@@ -224,7 +224,7 @@ UCTNode* select_node_with_ucb(UCTNode* node)
 }
 
 // UCT
-int search_uct(Board& board, const Color color, UCTNode* node)
+int UCTSample::search_uct(Board& board, const Color color, UCTNode* node)
 {
 	// UCBからプレイアウトする手を選択
 	UCTNode* selected_node;

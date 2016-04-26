@@ -5,12 +5,13 @@
 #include <time.h>
 #include "UCTSample.h"
 #include "UCTParallel.h"
+#include "UCTSaveAtari.h"
 #include "Human.h"
 
 using namespace std;
 
 // ƒvƒŒƒCƒ„[ˆê——
-Player* playerList[] = {new UCTSample(), new UCTParallel(), new Human()};
+Player* playerList[] = {new UCTSample(), new UCTParallel(), new UCTSaveAtari(), new Human()};
 
 static bool isPalying = false;
 static Board board;

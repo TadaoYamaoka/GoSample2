@@ -22,6 +22,12 @@ public:
 
 class UCTSample : public Player
 {
+protected:
+	static int playout(Board& board, const Color color);
+	static int search_uct(Board& board, const Color color, UCTNode* node);
+	static UCTNode* select_node_with_ucb(UCTNode* node);
+	static Color end_game(const Board& board);
+
 public:
 	UCTNode* root;
 	virtual XY select_move(Board& board, Color color);

@@ -146,6 +146,7 @@
     <ClCompile Include="..\Human.cpp" />
     <ClCompile Include="..\UCTParallel.cpp" />
     <ClCompile Include="..\UCTSample.cpp" />
+    <ClCompile Include="..\UCTSaveAtari.cpp" />
     <ClCompile Include="Test.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

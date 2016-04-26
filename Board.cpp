@@ -12,6 +12,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 	// パスの場合
 	if (xy == PASS) {
 		ko = -1;
+		pre_xy = PASS;
 		return SUCCESS;
 	}
 
@@ -30,7 +31,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 	// 呼吸点が一致する連を取得
 	for (int i = 0, hit_num = 0; hit_num < group_num; i++)
 	{
-		if (bit_test(&group_unusedflg[i / BIT], i % BIT) == 0)
+		if (group_unusedflg.bit_test(i) == 0)
 		{
 			hit_num++;
 			if (group[i].hit_liberties(xy))
@@ -173,14 +174,32 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 		// 相手の石の数を減算
 		stone_num[opponent(color)] -= remove.stone_num;
 
+		// 隣接する敵の連から連番号を削除
+		for (int j = 0, idx_offset = 0; j < remove.adjacent.get_part_size(); j++, idx_offset += BIT)
+		{
+			unsigned long idx_tmp;
+			while (remove.adjacent.bit_scan_forward(j, &idx_tmp))
+			{
+				GroupIndex idx = idx_offset + idx_tmp;
+				Group& adjacent_group = group[idx];
+				adjacent_group.adjacent.bit_test_and_reset(idx);
+
+				remove.adjacent.bit_test_and_reset(j, idx_tmp);
+			}
+		}
+
 		// 連を削除
 		remove_group(around_group_capture[i]);
 	}
 
-	// 呼吸点の削除
+	// 隣接する敵の連について
 	for (int i = 0; i < around_group_oponnent_num; i++)
 	{
+		// 呼吸点の削除
 		group[around_group_oponnent[i]].remove_liberty(xy);
+
+		// 隣接する敵の連番号を追加
+		group[board[xy]].adjacent.bit_test_and_set(i);
 	}
 
 	// コウ
@@ -192,6 +211,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 		ko = -1;
 	}
 
+	pre_xy = xy;
 	return SUCCESS;
 }
 
@@ -203,7 +223,7 @@ MoveResult Board::is_legal(const XY xy, const Color color, const bool fill_eye_e
 	// 呼吸点が一致する連を取得
 	for (int i = 0, hit_num = 0; hit_num < group_num; i++)
 	{
-		if (bit_test(&group_unusedflg[i / BIT], i % BIT) == 0)
+		if (group_unusedflg.bit_test(i) == 0)
 		{
 			hit_num++;
 			if (group[i].hit_liberties(xy))
