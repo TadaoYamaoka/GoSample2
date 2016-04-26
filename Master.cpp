@@ -112,6 +112,43 @@ int wmain(int argc, wchar_t* argv[]) {
 				}
 			}
 		}
+		if (wcscmp(argv[i], L"-player") == 0)
+		{
+			if (i + 1 < argc)
+			{
+				i++;
+				int player_i = _wtoi(argv[i]);
+				if (player_i >= 0 && player_i < sizeof(playerList) / sizeof(playerList[0]))
+				{
+					players[0] = playerList[player_i];
+					players[1] = playerList[player_i];
+				}
+			}
+		}
+		if (wcscmp(argv[i], L"-player0") == 0)
+		{
+			if (i + 1 < argc)
+			{
+				i++;
+				int player_i = _wtoi(argv[i]);
+				if (player_i >= 0 && player_i < sizeof(playerList) / sizeof(playerList[0]))
+				{
+					players[0] = playerList[player_i];
+				}
+			}
+		}
+		if (wcscmp(argv[i], L"-player1") == 0)
+		{
+			if (i + 1 < argc)
+			{
+				i++;
+				int player_i = _wtoi(argv[i]);
+				if (player_i >= 0 && player_i < sizeof(playerList) / sizeof(playerList[0]))
+				{
+					players[1] = playerList[player_i];
+				}
+			}
+		}
 		else {
 			// プレイアウト数
 			int n = _wtoi(argv[i]);
@@ -233,12 +270,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		for (int i = 0; i < 2; i++)
 		{
-			for (Player* player : playerList)
+			int selected = 0;
+			for (int j = 0; j < sizeof(playerList) / sizeof(playerList[0]); j++)
 			{
+				Player* player = playerList[j];
 				const char* name = typeid(*player).name();
 				SendMessageA(cmbPlayers[i], CB_ADDSTRING, NULL, (LPARAM)name + 6);
+
+				// 選択中のプレイヤー
+				if (player == players[i])
+				{
+					selected = j;
+				}
 			}
-			SendMessage(cmbPlayers[i], CB_SETCURSEL, 0, NULL);
+			SendMessage(cmbPlayers[i], CB_SETCURSEL, selected, NULL);
 		}
 
 		// スタートボタン
