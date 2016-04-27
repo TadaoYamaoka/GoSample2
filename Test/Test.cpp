@@ -143,9 +143,9 @@ void test_004() {
 
 int main()
 {
-	//test_001();
-	//test_002();
-	//test_003();
+	test_001();
+	test_002();
+	test_003();
 	test_004();
 	return 0;
 }

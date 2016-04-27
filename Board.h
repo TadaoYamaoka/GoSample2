@@ -2,6 +2,8 @@
 
 #include <intrin.h>
 #include <memory.h>
+#include "BitBoard.h"
+#include "FixedList.h"
 
 extern int BOARD_SIZE;
 extern int BOARD_WIDTH;
@@ -29,54 +31,6 @@ typedef unsigned char GroupIndex;
 const GroupIndex G_NONE = 0xff;
 const GroupIndex G_OFFBOARD = G_NONE - 1;
 
-#ifndef _WIN64
-typedef unsigned long BitBoard;
-inline unsigned char bit_test(const BitBoard *a, long b)
-{
-	return _bittest((const long *)a, b);
-}
-inline unsigned char bit_test_and_set(BitBoard *a, long b)
-{
-	return _bittestandset((long *)a, b);
-}
-inline unsigned char bit_test_and_reset(BitBoard *a, long b)
-{
-	return _bittestandreset((long *)a, b);
-}
-inline unsigned char bit_scan_forward(unsigned long *Index, BitBoard Mask)
-{
-	return _BitScanForward(Index, Mask);
-}
-inline int popcnt(unsigned long value)
-{
-	return (int)__popcnt(value);
-}
-
-#else
-typedef unsigned long long BitBoardPart;
-inline unsigned char bit_test(const BitBoardPart *a, long long b)
-{
-	return _bittest64((const long long *)a, b);
-}
-inline unsigned char bit_test_and_set(BitBoardPart *a, long long b)
-{
-	return _bittestandset64((long long *)a, b);
-}
-inline unsigned char bit_test_and_reset(BitBoardPart *a, long long b)
-{
-	return _bittestandreset64((long long *)a, b);
-}
-inline unsigned char bit_scan_forward(unsigned long *Index, BitBoardPart Mask)
-{
-	return _BitScanForward64(Index, Mask);
-}
-inline int popcnt(unsigned long long value)
-{
-	return (int)__popcnt64(value);
-}
-#endif
-const int BIT = sizeof(BitBoardPart) * 8;
-
 inline int get_x(const XY xy)
 {
 	return xy % BOARD_WIDTH;
@@ -102,80 +56,6 @@ enum MoveResult {
 	ILLIGAL,
 	KO,
 	EYE
-};
-
-template <const int N>
-class BitBoard
-{
-	BitBoardPart bitboard[(N + BIT - 1) / BIT];
-public:
-	int get_part_size() const {
-		return (N + BIT - 1) / BIT;
-	}
-
-	BitBoardPart get_bitboard_part(const int n) const {
-		return bitboard[n];
-	}
-
-	void set_bitboard_part(const int i, BitBoardPart val) {
-		bitboard[i] = val;
-	}
-
-	void set_all_zero() {
-		memset(bitboard, 0, sizeof(bitboard));
-	}
-
-	unsigned char bit_test(const short i) const {
-		return ::bit_test(&bitboard[i / BIT], i % BIT);
-	}
-
-	unsigned char bit_test_and_set(const short i) {
-		return ::bit_test_and_set(&bitboard[i / BIT], i % BIT);
-	}
-
-	unsigned char bit_test_and_reset(const short i) {
-		return ::bit_test_and_reset(&bitboard[i / BIT], i % BIT);
-	}
-
-	unsigned char bit_test_and_reset(const int n, const short i) {
-		return ::bit_test_and_reset(&bitboard[n], i);
-	}
-
-	unsigned char bit_scan_forward(const int n, unsigned long *Index) {
-		return ::bit_scan_forward(Index, bitboard[n]);
-	}
-
-	int merge_with_check(const BitBoard& src) {
-		int cnt = 0;
-		for (int i = 0; i < sizeof(bitboard) / sizeof(bitboard[0]); i++)
-		{
-			// 重複している数をカウント
-			cnt += popcnt(bitboard[i] & src.bitboard[i]);
-
-			bitboard[i] |= src.bitboard[i];
-		}
-		return cnt;
-	}
-
-	void merge(const BitBoard& src) {
-		for (int i = 0; i < sizeof(bitboard) / sizeof(bitboard[0]); i++)
-		{
-			bitboard[i] |= src.bitboard[i];
-		}
-	}
-
-	int get_first_pos() const {
-		int pos = 0;
-		for (int i = 0; i < sizeof(bitboard) / sizeof(bitboard[0]); i++, pos += BIT)
-		{
-			unsigned long idx;
-			if (::bit_scan_forward(&idx, bitboard[i]))
-			{
-				return pos + idx;
-			}
-		}
-		return -1;
-	}
 };
 
 class Group
@@ -270,9 +150,7 @@ public:
 	GroupIndex board[BOARD_BYTE_MAX];
 
 	// 連
-	Group group[GROUP_SIZE_MAX];
-	int group_num;
-	BitBoard<GROUP_SIZE_MAX> group_unusedflg;
+	FixedList<Group, GROUP_SIZE_MAX> groups;
 
 	XY ko;
 	XY pre_xy;
@@ -299,13 +177,7 @@ public:
 		{
 			board[BOARD_WIDTH * y] = G_OFFBOARD;
 		}
-		group_num = 0;
-		for (int i = 0; i < group_unusedflg.get_part_size() - 1; i++)
-		{
-			group_unusedflg.set_bitboard_part(i, -1);
-		}
-		group_unusedflg.set_bitboard_part(group_unusedflg.get_part_size() - 1, (1ll << (GROUP_SIZE_MAX % BIT)) - 1);
-
+		groups.init();
 		DIR4[0] = -1;
 		DIR4[1] = 1;
 		DIR4[2] = -BOARD_WIDTH;
@@ -323,7 +195,7 @@ public:
 		{
 			return OFFBOARD;
 		}
-		return group[board[xy]].color;
+		return groups[board[xy]].color;
 	}
 
 	bool is_empty(const XY xy) const {
@@ -337,45 +209,36 @@ public:
 	MoveResult move(const XY xy, const Color color, const bool fill_eye_err = true);
 	MoveResult is_legal(const XY xy, const Color color, const bool fill_eye_err = true) const;
 
-	int add_group(const XY xy, const Color color, const XY around_liberty[4]) {
-		// 未使用のインデックスを探す
-		int idx = group_unusedflg.get_first_pos();
+	GroupIndex add_group(const XY xy, const Color color, const XY around_liberty[4]) {
+		GroupIndex last = groups.add();
 
-		// 使用中にする
-		group_unusedflg.bit_test_and_reset(idx);
-
-		Group& last = group[idx];
-
-		group_num++;
-		last.color = color;
-		last.stone_num = 1;
-		last.stone[0] = xy;
-		last.liberty_num = 0;
-		last.liberty_bitboard.set_all_zero();
+		Group& group = groups[last];
+		group.color = color;
+		group.stone_num = 1;
+		group.stone[0] = xy;
+		group.liberty_num = 0;
+		group.liberty_bitboard.set_all_zero();
 		// 呼吸点
 		for (int i = 0; i < 4; i++)
 		{
 			if (around_liberty[i] != 0)
 			{
 				XY xyd = xy + DIR4[i];
-				last.liberty_bitboard.bit_test_and_set(xyd);
-				last.liberty_num++;
+				group.liberty_bitboard.bit_test_and_set(xyd);
+				group.liberty_num++;
 			}
 		}
-		last.adjacent.set_all_zero();
-		return idx;
+		group.adjacent.set_all_zero();
+		return last;
 	}
 
 	void remove_group(const size_t idx) {
-		group_num--;
-
-		// インデックスを未使用にする
-		group_unusedflg.bit_test_and_set(idx);
+		groups.remove(idx);
 	}
 
 	// グループ取得
-	const Group* get_group(const XY xy) const {
-		return &group[board[xy]];
+	const Group& get_group(const XY xy) const {
+		return groups[board[xy]];
 	}
 
 };

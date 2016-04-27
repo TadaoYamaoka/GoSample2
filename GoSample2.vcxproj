@@ -142,8 +142,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="BitBoard.h" />
     <ClInclude Include="Board.h" />
     <ClInclude Include="Debug.h" />
+    <ClInclude Include="FixedList.h" />
     <ClInclude Include="Human.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="Random.h" />

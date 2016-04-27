@@ -29,31 +29,28 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 	int capture_num = 0;
 
 	// 呼吸点が一致する連を取得
-	for (int i = 0, hit_num = 0; hit_num < group_num; i++)
+	for (GroupIndex idx = groups.begin(); idx != groups.end(); idx = groups.next(idx))
 	{
-		if (group_unusedflg.bit_test(i) == 0)
+		Group& group = groups[idx];
+		if (group.hit_liberties(xy))
 		{
-			hit_num++;
-			if (group[i].hit_liberties(xy))
+			if (group.color == color)
 			{
-				if (group[i].color == color)
+				around_group_self[around_group_self_num++] = idx;
+			}
+			else {
+				// 取ることができるか
+				if (group.liberty_num == 1)
 				{
-					around_group_self[around_group_self_num++] = i;
+					around_group_capture[around_group_capture_num++] = idx;
+					capture_num += group.stone_num;
+					if (group.stone_num == 1)
+					{
+						tmp_ko = group.stone[0];
+					}
 				}
 				else {
-					// 取ることができるか
-					if (group[i].liberty_num == 1)
-					{
-						around_group_capture[around_group_capture_num++] = i;
-						capture_num += group[i].stone_num;
-						if (group[i].stone_num == 1)
-						{
-							tmp_ko = group[i].stone[0];
-						}
-					}
-					else {
-						around_group_oponnent[around_group_oponnent_num++] = i;
-					}
+					around_group_oponnent[around_group_oponnent_num++] = idx;
 				}
 			}
 		}
@@ -82,7 +79,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 		}
 
 		// 隣接する自分の色の連の呼吸点がなくならないか
-		if (group[board[xyd]].color == color && group[board[xyd]].liberty_num >= 2)
+		if (groups[board[xyd]].color == color && groups[board[xyd]].liberty_num >= 2)
 		{
 			alive_num++;
 		}
@@ -119,7 +116,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 	else
 	{
 		// 連に石を追加
-		Group& group0 = group[around_group_self[0]];
+		Group& group0 = groups[around_group_self[0]];
 		group0.add_stone_and_liberties(xy, around_liberty);
 
 		// 連番号を埋める
@@ -130,7 +127,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 
 		for (int i = 1; i < around_group_self_num; i++)
 		{
-			Group& groupi = group[around_group_self[i]];
+			Group& groupi = groups[around_group_self[i]];
 
 			// 連をつなげる
 			group0.chain_group(xy, groupi);
@@ -150,7 +147,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 	for (int i = 0; i < around_group_capture_num; i++)
 	{
 		// 連のあった位置を空白にして呼吸点を追加する
-		Group &remove = group[around_group_capture[i]];
+		Group &remove = groups[around_group_capture[i]];
 		for (int j = 0; j < remove.stone_num; j++)
 		{
 			// 連のあった位置を空白にする
@@ -163,9 +160,9 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 				XY xyd = xyr + d;
 				if (board[xyd] != G_OFFBOARD && board[xyd] != G_NONE)
 				{
-					if (group[board[xyd]].color == color)
+					if (groups[board[xyd]].color == color)
 					{
-						group[board[xyd]].add_liberty(xyr);
+						groups[board[xyd]].add_liberty(xyr);
 					}
 				}
 			}
@@ -181,7 +178,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 			while (remove.adjacent.bit_scan_forward(j, &idx_tmp))
 			{
 				GroupIndex idx = idx_offset + idx_tmp;
-				Group& adjacent_group = group[idx];
+				Group& adjacent_group = groups[idx];
 				adjacent_group.adjacent.bit_test_and_reset(around_group_capture[i]);
 
 				remove.adjacent.bit_test_and_reset(j, idx_tmp);
@@ -196,17 +193,17 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 	for (int i = 0; i < around_group_oponnent_num; i++)
 	{
 		// 呼吸点の削除
-		group[around_group_oponnent[i]].remove_liberty(xy);
+		groups[around_group_oponnent[i]].remove_liberty(xy);
 
 		// 隣接する敵の連番号を追加
-		group[board[xy]].adjacent.bit_test_and_set(around_group_oponnent[i]);
+		groups[board[xy]].adjacent.bit_test_and_set(around_group_oponnent[i]);
 
 		// 敵の連にも自分を隣接する連として追加
-		group[around_group_oponnent[i]].adjacent.bit_test_and_set(board[xy]);
+		groups[around_group_oponnent[i]].adjacent.bit_test_and_set(board[xy]);
 	}
 
 	// コウ
-	if (capture_num == 1 && group[board[xy]].stone_num == 1 && group[board[xy]].liberty_num == 1)
+	if (capture_num == 1 && groups[board[xy]].stone_num == 1 && groups[board[xy]].liberty_num == 1)
 	{
 		ko = tmp_ko;
 	}
@@ -224,22 +221,19 @@ MoveResult Board::is_legal(const XY xy, const Color color, const bool fill_eye_e
 	int capture_num = 0;
 
 	// 呼吸点が一致する連を取得
-	for (int i = 0, hit_num = 0; hit_num < group_num; i++)
+	for (GroupIndex idx = groups.begin(); idx != groups.end(); idx = groups.next(idx))
 	{
-		if (group_unusedflg.bit_test(i) == 0)
+		const Group& group = groups[idx];
+		if (group.hit_liberties(xy))
 		{
-			hit_num++;
-			if (group[i].hit_liberties(xy))
+			if (group.color == color)
 			{
-				if (group[i].color == color)
+			}
+			else {
+				// 取ることができるか
+				if (group.liberty_num == 1)
 				{
-				}
-				else {
-					// 取ることができるか
-					if (group[i].liberty_num == 1)
-					{
-						capture_num += group[i].stone_num;
-					}
+					capture_num += group.stone_num;
 				}
 			}
 		}
@@ -268,7 +262,7 @@ MoveResult Board::is_legal(const XY xy, const Color color, const bool fill_eye_e
 		}
 
 		// 隣接する自分の色の連の呼吸点がなくならないか
-		if (group[board[xyd]].color == color && group[board[xyd]].liberty_num >= 2)
+		if (groups[board[xyd]].color == color && groups[board[xyd]].liberty_num >= 2)
 		{
 			alive_num++;
 		}
