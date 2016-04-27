@@ -549,7 +549,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					drawY = scaledX(MARGIN);
 				}
 				wchar_t str[20];
-				int len = wsprintf(str, L"%3d/%d\n.%d", result[i].win_num, result[i].playout_num, result[i].playout_num > 0 ? 100 * result[i].win_num / result[i].playout_num : 0);
+				int len = wsprintf(str, L"%3d/%d\n%d", result[i].win_num, result[i].playout_num, result[i].playout_num > 0 ? 100 * result[i].win_num / result[i].playout_num : 0);
 				RECT rc = { drawX, drawY, drawX + scaledX(GRID_WIDTH), drawY + scaledY(GRID_WIDTH) };
 				DrawText(hDC, str, len, &rc, DT_CENTER);
 			}
