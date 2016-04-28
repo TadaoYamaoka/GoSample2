@@ -21,7 +21,7 @@ int UCTSaveAtari::get_atari_save(const Board& board, const Color color, BitBoard
 
 		// TODO 死活探索
 
-			// 呼吸点に打った場合に助けることができるか
+		// 呼吸点に打った場合に助けることができるか
 		if (group.color == color && group.liberty_num == 1)
 		{
 			// 呼吸点の場所
@@ -59,9 +59,9 @@ int UCTSaveAtari::get_atari_save(const Board& board, const Color color, BitBoard
 					}
 				}
 			}
-			if (liberty >= 2)
+			if (liberty >= 3)
 			{
-				// アタリを助けた後にも呼吸点が2以上ある
+				// アタリを助けた後にも呼吸点が3以上ある(2はシチョウの可能性があるので除外)
 				atari_save.bit_test_and_set(xy);
 			}
 

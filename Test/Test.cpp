@@ -31,6 +31,17 @@ void assert(const XY xy, const XY expected)
 	}
 }
 
+void assert_not(const XY xy, const XY expected)
+{
+	if (xy != expected)
+	{
+		printf("success\n");
+	}
+	else {
+		printf("fail\n");
+	}
+}
+
 void print_child(UCTNode* root)
 {
 	for (int i = 0; i < root->child_num; i++)
@@ -139,6 +150,9 @@ void test_004() {
 
 	print_child(player.root);
 	printf("xy = %d, x,y = %d,%d\n", xy, get_x(xy), get_y(xy));
+
+	// 9,7‚ÍNG
+	assert_not(xy, get_xy(9, 7));
 }
 
 int main()
