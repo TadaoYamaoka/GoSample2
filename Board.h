@@ -137,9 +137,14 @@ public:
 		liberty_num--;
 	}
 
-	// ˆê‚Â–Ú‚ÌŒÄ‹z“_‚Ìê‡
+	// ˆê‚Â–Ú‚ÌŒÄ‹z“_‚ğæ“¾
 	XY get_first_liberty() const {
 		return liberty_bitboard.get_first_pos();
+	}
+
+	// ŒÄ‹z“_‚ğ4‚Â‚Ü‚Åæ“¾
+	int get_four_liberties(XY pos[4]) const {
+		return liberty_bitboard.get_four_pos(pos);
 	}
 };
 

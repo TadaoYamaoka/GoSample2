@@ -2,15 +2,228 @@
 #include "Random.h"
 #include "UCTSaveAtari.h"
 
+#ifndef _DEBUG
 const int THREAD_NUM = 8; // 論理コア数
+#else
+const int THREAD_NUM = 8; // 論理コア数
+#endif // !_DEBUG
 
 extern thread_local Random random;
 
 extern UCTNode* create_root_node();
 extern UCTNode* create_child_node(const int size);
 
+int get_atari_save(const Board& board, const Color color, BitBoard<BOARD_BYTE_MAX>& atari_save);
+bool is_atari_save_with_ladder_search(const Board& board, const Color color, const XY xy);
+
+// 展開されたノードがアタリを助ける手か調べる
+void check_atari_save(const Board& board, const Color color, UCTNode* node)
+{
+	for (int i = 0; i < node->child_num; i++)
+	{
+		node->child[i].is_atari_save = is_atari_save_with_ladder_search(board, color, node->child[i].xy);
+	}
+}
+
+// シチョウ判定
+bool ladder_search(const Board& board, const Color color, const XY xy, Color tmp_board[BOARD_BYTE_MAX], XY liberties[2], const int depth)
+{
+	if (depth == 0)
+	{
+		return false;
+	}
+
+	// 石を置く
+	tmp_board[xy] = color;
+
+	// 石を置いた場所の呼吸点について
+	for (int i = 0; i < 2; i++)
+	{
+		XY xyl = liberties[i];
+
+		// もう一方の場所に敵の石を置く
+		tmp_board[liberties[1 - i]] = opponent(color);
+
+		// 敵の石を置いた後のもう一方の呼吸点の呼吸点
+		int liberty_num = 0;
+		XY liberties_afer[8] = { 0 }; // 大きめに確保
+		for (XY d : DIR4)
+		{
+			XY xyld = xyl + d;
+
+			if (xyld == xy)
+			{
+				continue;
+			}
+
+			if (board.is_empty(xyld) && tmp_board[xyld] == EMPTY)
+			{
+				liberties_afer[liberty_num++] = xyld;
+				continue;
+			}
+
+			if (board.is_offboard(xyld))
+			{
+				continue;
+			}
+
+			// もう一方の呼吸点に石を置いた場合、石を取ることができるか
+			const Group& group = board.get_group(xyld);
+			if (board[xyld] == opponent(color))
+			{
+				if (group.liberty_num == 1)
+				{
+					liberties_afer[liberty_num++] = xyld;
+				}
+			}
+			else if (board[xyld] == color)
+			{
+				// 連結した後の呼吸点
+
+				XY liberties_tmp[4];
+				int num = group.get_four_liberties(liberties_tmp);
+				for (int j = 0; j < num && liberty_num < 4; j++)
+				{
+					XY xy_tmp = liberties_tmp[j];
+					if (tmp_board[xy_tmp] == EMPTY && xy_tmp != xyl)
+					{
+						liberties_afer[liberty_num++] = xy_tmp;
+					}
+				}
+			}
+		}
+
+		// 呼吸点が1の場合、シチョウ
+		if (liberty_num == 1)
+		{
+			return true;
+		}
+		else if (liberty_num == 2)
+		{
+			// 呼吸点が2の場合、次の手を探索
+			if (ladder_search(board, color, xyl, tmp_board, liberties_afer, depth - 1))
+			{
+				return true;
+			}
+		}
+
+		// この場所はシチョウではない
+		// 手を戻す
+		tmp_board[liberties[1 - i]] = EMPTY;
+	}
+
+	// 手を戻す
+	tmp_board[xy] = EMPTY;
+
+	return false;
+}
+
+// アタリを助ける手か（シチョウ判定有）
+bool is_atari_save_with_ladder_search(const Board& board, const Color color, const XY xy)
+{
+	if (xy == PASS)
+	{
+		return false;
+	}
+
+	XY liberties[8] = { 0 }; // 大きめに確保
+
+	bool is_atari_save = false;
+
+	int liberty_num = 0;
+	for (XY d : DIR4)
+	{
+		XY xyd = xy + d;
+
+		if (board.is_empty(xyd))
+		{
+			liberties[liberty_num++] = xyd;
+			continue;
+		}
+		if (board.is_offboard(xyd))
+		{
+			continue;
+		}
+
+		const Group& adjacent_group = board.get_group(xyd);
+
+		if (adjacent_group.color == color)
+		{
+			// 隣接する自分の連の呼吸点が1か
+			if (adjacent_group.liberty_num == 1)
+			{
+				// アタリを助ける手
+				is_atari_save = true;
+			}
+			else
+			{
+				// 連結後の呼吸点
+
+				// シチョウ判定を行う場合、連結後の呼吸点を取得
+				XY liberties_tmp[4];
+				int num = adjacent_group.get_four_liberties(liberties_tmp);
+				for (int j = 0; j < num && liberty_num < 4; j++)
+				{
+					XY xy_tmp = liberties_tmp[j];
+					if (xy_tmp != xy)
+					{
+						liberties[liberty_num++] = xy_tmp;
+					}
+				}
+			}
+		}
+		else
+		{
+			if (adjacent_group.liberty_num == 1)
+			{
+				// 取ることができる
+				liberties[liberty_num++] = xyd;
+
+				// 取る連に隣接する自分の連の呼吸点1の場合、アタリを助ける手
+				GroupIndex group_idx_tmp = 0;
+				for (int j = 0; j < adjacent_group.adjacent.get_part_size(); j++, group_idx_tmp += BIT)
+				{
+					BitBoardPart adjacent_bitborad = adjacent_group.adjacent.get_bitboard_part(j);
+					unsigned long idx;
+					while (bit_scan_forward(&idx, adjacent_bitborad))
+					{
+						GroupIndex group_idx = group_idx_tmp + idx;
+						if (board.groups[group_idx].liberty_num == 1)
+						{
+							return true;
+						}
+
+						bit_test_and_reset(&adjacent_bitborad, idx);
+					}
+				}
+			}
+		}
+	}
+
+	if (is_atari_save)
+	{
+		if (liberty_num >= 3)
+		{
+			// アタリを助けた後にも呼吸点が3以上ある(2はシチョウの可能性があるので除外)
+			return true;
+		}
+		else if (liberty_num == 2)
+		{
+			// シチョウ判定
+			Color tmp_board[BOARD_BYTE_MAX] = { 0 };
+			if (!ladder_search(board, color, xy, tmp_board, liberties, 10))
+			{
+				// シチョウではないので、アタリを助ける手とする
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 // アタリを助ける手を取得
-int UCTSaveAtari::get_atari_save(const Board& board, const Color color, BitBoard<BOARD_BYTE_MAX>& atari_save)
+int get_atari_save(const Board& board, const Color color, BitBoard<BOARD_BYTE_MAX>& atari_save)
 {
 	int atari_save_num = 0;
 
@@ -19,21 +232,19 @@ int UCTSaveAtari::get_atari_save(const Board& board, const Color color, BitBoard
 	{
 		const Group& group = board.groups[idx];
 
-		// TODO 死活探索
-
 		// 呼吸点に打った場合に助けることができるか
 		if (group.color == color && group.liberty_num == 1)
 		{
 			// 呼吸点の場所
 			XY xy = group.get_first_liberty();
 
-			int liberty = 0;
+			int liberty_num = 0;
 			for (XY d : DIR4)
 			{
 				XY xyd = xy + d;
 				if (board.is_empty(xyd))
 				{
-					liberty++;
+					liberty_num++;
 					continue;
 				}
 				if (board.is_offboard(xyd))
@@ -47,7 +258,7 @@ int UCTSaveAtari::get_atari_save(const Board& board, const Color color, BitBoard
 					if (board.board[xyd] != idx)
 					{
 						// 連結後の呼吸点
-						liberty += adjacent_group.liberty_num - 1;
+						liberty_num += adjacent_group.liberty_num - 1;
 					}
 				}
 				else
@@ -55,11 +266,11 @@ int UCTSaveAtari::get_atari_save(const Board& board, const Color color, BitBoard
 					if (adjacent_group.liberty_num == 1)
 					{
 						// 取ることができる
-						liberty++;
+						liberty_num++;
 					}
 				}
 			}
-			if (liberty >= 3)
+			if (liberty_num >= 3)
 			{
 				// アタリを助けた後にも呼吸点が3以上ある(2はシチョウの可能性があるので除外)
 				atari_save.bit_test_and_set(xy);
@@ -183,11 +394,6 @@ int UCTSaveAtari::playout(Board& board, const Color color)
 // UCBからプレイアウトする手を選択
 UCTNode* UCTSaveAtari::select_node_with_ucb(const Board& board, const Color color, UCTNode* node)
 {
-	// アタリを助ける手を選ばれやすくする
-	BitBoard<BOARD_BYTE_MAX> atari_save;
-	atari_save.set_all_zero();
-	int atari_save_num = get_atari_save(board, color, atari_save);
-
 	UCTNode* selected_node;
 	double max_ucb = -999;
 	for (int i = 0; i < node->child_num; i++)
@@ -200,7 +406,7 @@ UCTNode* UCTSaveAtari::select_node_with_ucb(const Board& board, const Color colo
 			// PASSに低いボーナス
 			bonus = 0.01;
 		}
-		else if (atari_save.bit_test(child->xy)) {
+		else if (child->is_atari_save) {
 			// アタリを助ける手にボーナス
 			bonus = 10.0;
 		}
@@ -259,6 +465,9 @@ int UCTSaveAtari::search_uct(Board& board, const Color color, UCTNode* node)
 			// ノードを展開
 			if (selected_node->playout_num == THR && selected_node->expand_node(board))
 			{
+				// 展開されたノードがアタリを助ける手か調べる
+				check_atari_save(board, color, selected_node);
+
 				win = 1 - search_uct(board, opponent(color), selected_node);
 			}
 			else {
@@ -305,6 +514,9 @@ void UCTSaveAtari::search_uct_root(Board& board, const Color color, UCTNode* nod
 			// ノードを展開
 			if (selected_node_copy->expand_node(board))
 			{
+				// 展開されたノードがアタリを助ける手か調べる
+				check_atari_save(board, color, selected_node_copy);
+
 				win = 1 - search_uct(board, opponent(color), selected_node_copy);
 			}
 			else {
@@ -330,6 +542,9 @@ XY UCTSaveAtari::select_move(Board& board, Color color)
 
 	// ノードを展開(合法手のみ)
 	expand_root_node(board, color, root);
+
+	// 展開されたノードがアタリを助ける手か調べる
+	check_atari_save(board, color, root);
 
 	// root並列化
 	std::thread th[THREAD_NUM];

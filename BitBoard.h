@@ -108,8 +108,8 @@ public:
 		}
 	}
 
-	int get_first_pos() const {
-		int pos = 0;
+	short get_first_pos() const {
+		short pos = 0;
 		for (int i = 0; i < sizeof(bitboard) / sizeof(bitboard[0]); i++, pos += BIT)
 		{
 			unsigned long idx;
@@ -119,5 +119,25 @@ public:
 			}
 		}
 		return -1;
+	}
+
+	int get_four_pos(short pos[4]) const {
+		int num = 0;
+		short pos_tmp = 0;
+		for (int i = 0; i < sizeof(bitboard) / sizeof(bitboard[0]) && num < 4; i++, pos_tmp += BIT)
+		{
+			BitBoardPart bitboard_tmp = bitboard[i];
+			unsigned long idx;
+			while (::bit_scan_forward(&idx, bitboard_tmp))
+			{
+				pos[num++] = pos_tmp + idx;
+				if (num == 4)
+				{
+					return num;
+				}
+				::bit_test_and_reset(&bitboard_tmp, idx);
+			}
+		}
+		return num;
 	}
 };

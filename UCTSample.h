@@ -17,6 +17,8 @@ public:
 	int child_num; // 子ノードの数
 	UCTNode* child; // 子ノード
 
+	bool is_atari_save; // アタリを助ける手か
+
 	bool expand_node(const Board& board);
 };
 

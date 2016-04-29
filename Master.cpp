@@ -210,7 +210,7 @@ int wmain(int argc, wchar_t* argv[]) {
 	HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
 	LOGFONT lf;
 	GetObject(hFont, sizeof(lf), &lf);
-	lf.lfHeight = -scaledY(12);
+	lf.lfHeight = -scaledY(10);
 	lf.lfWidth = 0;
 	hFontPlayout = CreateFontIndirect(&lf);
 	// PassƒtƒHƒ“ƒg
@@ -542,14 +542,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				int x = get_x(result[i].xy);
 				int y = get_y(result[i].xy);
 				int drawX = scaledX(MARGIN + GRID_WIDTH * (x - 0.5f));
-				int drawY = scaledY(MARGIN + GRID_WIDTH * (y - 0.25f));
+				int drawY = scaledY(MARGIN + GRID_WIDTH * (y - 0.35f));
 				if (x == 0)
 				{
 					drawX = scaledX(MARGIN);
 					drawY = scaledX(MARGIN);
 				}
 				wchar_t str[20];
-				int len = wsprintf(str, L"%3d/%d\n%d", result[i].win_num, result[i].playout_num, result[i].playout_num > 0 ? 100 * result[i].win_num / result[i].playout_num : 0);
+				int len = wsprintf(str, L"%3d\n%d\n%d", result[i].win_num, result[i].playout_num, result[i].playout_num > 0 ? 100 * result[i].win_num / result[i].playout_num : 0);
 				RECT rc = { drawX, drawY, drawX + scaledX(GRID_WIDTH), drawY + scaledY(GRID_WIDTH) };
 				DrawText(hDC, str, len, &rc, DT_CENTER);
 			}
