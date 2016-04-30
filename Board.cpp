@@ -181,7 +181,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 				Group& adjacent_group = groups[idx];
 				adjacent_group.adjacent.bit_test_and_reset(around_group_capture[i]);
 
-				remove.adjacent.bit_test_and_reset(j, idx_tmp);
+				remove.adjacent.bit_reset_for_bsf(j); // íœ‚·‚é˜A‚È‚Ì‚ÅXV‚µ‚Ä‚æ‚¢
 			}
 		}
 

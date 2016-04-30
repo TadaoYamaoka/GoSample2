@@ -89,6 +89,10 @@ public:
 		return ::bit_scan_forward(Index, bitboard[n]);
 	}
 
+	void bit_reset_for_bsf(const int n) {
+		bitboard[n] &= bitboard[n] - 1;
+	}
+
 	int merge_with_check(const BitBoard& src) {
 		int cnt = 0;
 		for (int i = 0; i < sizeof(bitboard) / sizeof(bitboard[0]); i++)
