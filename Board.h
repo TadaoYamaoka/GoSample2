@@ -212,7 +212,8 @@ public:
 	}
 
 	MoveResult move(const XY xy, const Color color, const bool fill_eye_err = true);
-	MoveResult is_legal(const XY xy, const Color color, const bool fill_eye_err = true) const;
+	MoveResult is_legal(const XY xy, const Color color) const;
+	void move_legal(const XY xy, const Color color);
 
 	GroupIndex add_group(const XY xy, const Color color, const XY around_liberty[4]) {
 		GroupIndex last = groups.add();

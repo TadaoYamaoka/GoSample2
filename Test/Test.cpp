@@ -365,10 +365,10 @@ void test_ladder_search_007()
 
 int main()
 {
-	//test_001();
-	//test_002();
-	//test_003();
-	//test_004();
+	test_001();
+	test_002();
+	test_003();
+	test_004();
 	test_ladder_search_001();
 	test_ladder_search_002();
 	test_ladder_search_003();

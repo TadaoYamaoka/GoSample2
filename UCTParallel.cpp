@@ -16,9 +16,8 @@ void UCTParallel::search_uct_root(Board& board, const Color color, UCTNode* node
 	// rootノードはアトミックに更新するためUCB計算ではロックしない
 	UCTNode* selected_node = select_node_with_ucb(node);
 
-	board.move(selected_node->xy, color);
-
 	// rootでは全て合法手なのでエラーチェックはしない
+	board.move_legal(selected_node->xy, color);
 
 	// コピーされたノードに変換
 	UCTNode* selected_node_copy = copynodemap.at(selected_node);
