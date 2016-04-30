@@ -71,7 +71,7 @@ int wmain(int argc, wchar_t* argv[]) {
 		{
 			isGTPMode = true;
 		}
-		if (wcscmp(argv[i], L"-log") == 0)
+		else if (wcscmp(argv[i], L"-log") == 0)
 		{
 			if (i + 1 < argc)
 			{
@@ -79,7 +79,7 @@ int wmain(int argc, wchar_t* argv[]) {
 				logfile = argv[i];
 			}
 		}
-		if (wcscmp(argv[i], L"-sgf") == 0)
+		else if (wcscmp(argv[i], L"-sgf") == 0)
 		{
 			if (i + 1 < argc)
 			{
@@ -87,7 +87,7 @@ int wmain(int argc, wchar_t* argv[]) {
 				sgffile = argv[i];
 			}
 		}
-		if (wcscmp(argv[i], L"-size") == 0)
+		else if (wcscmp(argv[i], L"-size") == 0)
 		{
 			if (i + 1 < argc)
 			{
@@ -100,7 +100,7 @@ int wmain(int argc, wchar_t* argv[]) {
 				}
 			}
 		}
-		if (wcscmp(argv[i], L"-komi") == 0)
+		else if (wcscmp(argv[i], L"-komi") == 0)
 		{
 			if (i + 1 < argc)
 			{
@@ -112,7 +112,7 @@ int wmain(int argc, wchar_t* argv[]) {
 				}
 			}
 		}
-		if (wcscmp(argv[i], L"-player") == 0)
+		else if (wcscmp(argv[i], L"-player") == 0)
 		{
 			if (i + 1 < argc)
 			{
@@ -125,7 +125,7 @@ int wmain(int argc, wchar_t* argv[]) {
 				}
 			}
 		}
-		if (wcscmp(argv[i], L"-player0") == 0)
+		else if (wcscmp(argv[i], L"-player0") == 0)
 		{
 			if (i + 1 < argc)
 			{
@@ -137,7 +137,7 @@ int wmain(int argc, wchar_t* argv[]) {
 				}
 			}
 		}
-		if (wcscmp(argv[i], L"-player1") == 0)
+		else if (wcscmp(argv[i], L"-player1") == 0)
 		{
 			if (i + 1 < argc)
 			{
@@ -549,7 +549,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					drawY = scaledX(MARGIN);
 				}
 				wchar_t str[20];
-				int len = wsprintf(str, L"%3d\n%d\n%d", result[i].win_num, result[i].playout_num, result[i].playout_num > 0 ? 100 * result[i].win_num / result[i].playout_num : 0);
+				int len = wsprintf(str, L"%d\n%d\n%d", result[i].win_num, result[i].playout_num, result[i].playout_num > 0 ? 100 * result[i].win_num / result[i].playout_num : 0);
 				RECT rc = { drawX, drawY, drawX + scaledX(GRID_WIDTH), drawY + scaledY(GRID_WIDTH) };
 				DrawText(hDC, str, len, &rc, DT_CENTER);
 			}

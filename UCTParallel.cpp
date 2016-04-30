@@ -1,7 +1,11 @@
 #include <future>
 #include "UCTParallel.h"
 
+#ifndef _DEBUG
 const int THREAD_NUM = 8; // 論理コア数
+#else
+const int THREAD_NUM = 1; // 論理コア数
+#endif // !_DEBUG
 
 extern UCTNode* create_root_node();
 extern UCTNode* create_child_node(const int size);
