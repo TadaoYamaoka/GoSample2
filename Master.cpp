@@ -323,6 +323,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				Color pre_xy = -1;
 				record_num = 0;
 				current_player = nullptr;
+				result_num = 0;
 
 				InvalidateRect(hWnd, NULL, FALSE);
 
