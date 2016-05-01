@@ -314,11 +314,15 @@ int UCTSaveAtari::playout(Board& board, const Color color)
 
 		// Œó•âŽèˆê——
 		int possibles_num = 0;
-		for (XY xy = BOARD_WIDTH + 1; xy < BOARD_MAX - BOARD_WIDTH; xy++)
+		for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
 		{
-			if (board.is_empty(xy))
+			for (XY x = 1; x <= BOARD_SIZE; x++)
 			{
-				possibles[possibles_num++] = xy;
+				XY xy = y + x;
+				if (board.is_empty(xy))
+				{
+					possibles[possibles_num++] = xy;
+				}
 			}
 		}
 

@@ -50,16 +50,20 @@ bool UCTNode::expand_node(const Board& board)
 
 	// ノードの値を設定
 	int i = 0;
-	for (XY xy = BOARD_WIDTH + 1; xy < BOARD_MAX - BOARD_WIDTH; xy++)
+	for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
 	{
-		if (board.is_empty(xy))
+		for (XY x = 1; x <= BOARD_SIZE; x++)
 		{
-			child[i].xy = xy;
-			child[i].playout_num = 0;
-			child[i].playout_num_sum = 0;
-			child[i].win_num = 0;
-			child[i].child_num = 0;
-			i++;
+			XY xy = y + x;
+			if (board.is_empty(xy))
+			{
+				child[i].xy = xy;
+				child[i].playout_num = 0;
+				child[i].playout_num_sum = 0;
+				child[i].win_num = 0;
+				child[i].child_num = 0;
+				i++;
+			}
 		}
 	}
 	// PASSを追加
@@ -95,22 +99,26 @@ Color UCTSample::end_game(const Board& board)
 	//debug_print_board(board);
 
 	// 眼を数える
-	for (XY xy = BOARD_WIDTH + 1; xy < BOARD_MAX - BOARD_WIDTH; xy++)
+	for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
 	{
-		int mk[] = { 0, 0, 0, 0 }; // 各色の4方向の石の数
-		for (int d : DIR4)
+		for (XY x = 1; x <= BOARD_SIZE; x++)
 		{
-			mk[board[xy + d]]++;
-		}
-		// 黒の眼
-		if (mk[BLACK] > 0 && mk[WHITE] == 0)
-		{
-			score++;
-		}
-		// 白の眼
-		if (mk[WHITE] > 0 && mk[BLACK] == 0)
-		{
-			score--;
+			XY xy = y + x;
+			int mk[] = { 0, 0, 0, 0 }; // 各色の4方向の石の数
+			for (int d : DIR4)
+			{
+				mk[board[xy + d]]++;
+			}
+			// 黒の眼
+			if (mk[BLACK] > 0 && mk[WHITE] == 0)
+			{
+				score++;
+			}
+			// 白の眼
+			if (mk[WHITE] > 0 && mk[BLACK] == 0)
+			{
+				score--;
+			}
 		}
 	}
 
@@ -136,11 +144,15 @@ int UCTSample::playout(Board& board, const Color color)
 	{
 		// 候補手一覧
 		int possibles_num = 0;
-		for (XY xy = BOARD_WIDTH + 1; xy < BOARD_MAX - BOARD_WIDTH; xy++)
+		for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
 		{
-			if (board.is_empty(xy))
+			for (XY x = 1; x <= BOARD_SIZE; x++)
 			{
-				possibles[possibles_num++] = xy;
+				XY xy = y + x;
+				if (board.is_empty(xy))
+				{
+					possibles[possibles_num++] = xy;
+				}
 			}
 		}
 

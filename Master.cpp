@@ -492,19 +492,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		Ellipse(hDC, starXYR - 3, starXYR - 3, starXYR + 3, starXYR + 3);
 
 		// êŒÇï`âÊ
-		for (XY xy = BOARD_WIDTH; xy < BOARD_MAX - BOARD_WIDTH; xy++)
+		for (XY yy = BOARD_WIDTH; yy < BOARD_MAX - BOARD_WIDTH; yy += BOARD_WIDTH)
 		{
-			int x = scaledX(MARGIN + GRID_WIDTH * (get_x(xy) - 0.5f));
-			int y = scaledY(MARGIN + GRID_WIDTH * (get_y(xy) - 0.5f));
-			if (board[xy] == BLACK)
+			for (XY xx = 1; xx <= BOARD_SIZE; xx++)
 			{
-				SelectObject(hDC, (HBRUSH)GetStockObject(BLACK_BRUSH));
-				Ellipse(hDC, x, y, x + GRID_WIDTH, y + GRID_WIDTH);
-			}
-			else if (board[xy] == WHITE)
-			{
-				SelectObject(hDC, (HBRUSH)GetStockObject(WHITE_BRUSH));
-				Ellipse(hDC, x, y, x + GRID_WIDTH, y + GRID_WIDTH);
+				XY xy = yy + xx;
+				int x = scaledX(MARGIN + GRID_WIDTH * (get_x(xy) - 0.5f));
+				int y = scaledY(MARGIN + GRID_WIDTH * (get_y(xy) - 0.5f));
+				if (board[xy] == BLACK)
+				{
+					SelectObject(hDC, (HBRUSH)GetStockObject(BLACK_BRUSH));
+					Ellipse(hDC, x, y, x + GRID_WIDTH, y + GRID_WIDTH);
+				}
+				else if (board[xy] == WHITE)
+				{
+					SelectObject(hDC, (HBRUSH)GetStockObject(WHITE_BRUSH));
+					Ellipse(hDC, x, y, x + GRID_WIDTH, y + GRID_WIDTH);
+				}
 			}
 		}
 

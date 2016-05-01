@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.24720.0
+VisualStudioVersion = 14.0.25123.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GoSample2", "GoSample2.vcxproj", "{F5AE0D41-9DCA-4585-A1D3-1EF83215F260}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Test", "Test\Test.vcxproj", "{D3FD4D2A-F686-4721-8A0A-34EB1698CA29}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "learn", "learn\learn.vcxproj", "{092C9016-716A-40CD-BD0B-BD297BA6BBC4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -31,6 +33,14 @@ Global
 		{D3FD4D2A-F686-4721-8A0A-34EB1698CA29}.Release|x64.Build.0 = Release|x64
 		{D3FD4D2A-F686-4721-8A0A-34EB1698CA29}.Release|x86.ActiveCfg = Release|Win32
 		{D3FD4D2A-F686-4721-8A0A-34EB1698CA29}.Release|x86.Build.0 = Release|Win32
+		{092C9016-716A-40CD-BD0B-BD297BA6BBC4}.Debug|x64.ActiveCfg = Debug|x64
+		{092C9016-716A-40CD-BD0B-BD297BA6BBC4}.Debug|x64.Build.0 = Debug|x64
+		{092C9016-716A-40CD-BD0B-BD297BA6BBC4}.Debug|x86.ActiveCfg = Debug|Win32
+		{092C9016-716A-40CD-BD0B-BD297BA6BBC4}.Debug|x86.Build.0 = Debug|Win32
+		{092C9016-716A-40CD-BD0B-BD297BA6BBC4}.Release|x64.ActiveCfg = Release|x64
+		{092C9016-716A-40CD-BD0B-BD297BA6BBC4}.Release|x64.Build.0 = Release|x64
+		{092C9016-716A-40CD-BD0B-BD297BA6BBC4}.Release|x86.ActiveCfg = Release|Win32
+		{092C9016-716A-40CD-BD0B-BD297BA6BBC4}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

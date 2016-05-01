@@ -57,13 +57,17 @@ void UCTParallel::expand_root_node(const Board& board, const Color color, UCTNod
 {
 	// 合法手の数をカウント
 	XY legal_xy[BOARD_SIZE_MAX * BOARD_SIZE_MAX + 1];
-	for (XY xy = BOARD_WIDTH + 1; xy < BOARD_MAX - BOARD_WIDTH; xy++)
+	for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
 	{
-		if (board.is_empty(xy))
+		for (XY x = 1; x <= BOARD_SIZE; x++)
 		{
-			if (board.is_legal(xy, color) == SUCCESS)
+			XY xy = y + x;
+			if (board.is_empty(xy))
 			{
-				legal_xy[root->child_num++] = xy;
+				if (board.is_legal(xy, color) == SUCCESS)
+				{
+					legal_xy[root->child_num++] = xy;
+				}
 			}
 		}
 	}
