@@ -11,7 +11,7 @@ extern int BOARD_STONE_MAX;
 extern int BOARD_MAX;
 const int BOARD_SIZE_MAX = 19;
 const int GROUP_SIZE_MAX = BOARD_SIZE_MAX * BOARD_SIZE_MAX / 2;
-const int BOARD_BYTE_MAX = (BOARD_SIZE_MAX + 1) * (BOARD_SIZE_MAX + 2);
+const int BOARD_BYTE_MAX = (BOARD_SIZE_MAX + 1) * (BOARD_SIZE_MAX + 2) + 1;
 
 extern double KOMI;
 
@@ -182,6 +182,7 @@ public:
 		{
 			board[BOARD_WIDTH * y] = G_OFFBOARD;
 		}
+		board[BOARD_WIDTH * (BOARD_SIZE + 2)] = G_OFFBOARD;
 		groups.init();
 		DIR4[0] = -1;
 		DIR4[1] = 1;
@@ -212,7 +213,7 @@ public:
 	}
 
 	MoveResult move(const XY xy, const Color color, const bool fill_eye_err = true);
-	MoveResult is_legal(const XY xy, const Color color) const;
+	MoveResult is_legal(const XY xy, const Color color, const bool fill_eye_err = true) const;
 	void move_legal(const XY xy, const Color color);
 
 	GroupIndex add_group(const XY xy, const Color color, const XY around_liberty[4]) {

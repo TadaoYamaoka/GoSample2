@@ -215,7 +215,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 	return SUCCESS;
 }
 
-MoveResult Board::is_legal(const XY xy, const Color color) const
+MoveResult Board::is_legal(const XY xy, const Color color, const bool fill_eye_err) const
 {
 	// ŽüˆÍ4•ûŒü‚Ì˜A
 	int capture_num = 0;
@@ -279,7 +279,7 @@ MoveResult Board::is_legal(const XY xy, const Color color) const
 		return KO;
 	}
 	// Šá
-	if (offboard_num + alive_num == 4)
+	if (offboard_num + alive_num == 4 && fill_eye_err)
 	{
 		return EYE;
 	}

@@ -18,6 +18,10 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\Board.cpp" />
+    <ClCompile Include="learn.cpp" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{092C9016-716A-40CD-BD0B-BD297BA6BBC4}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
