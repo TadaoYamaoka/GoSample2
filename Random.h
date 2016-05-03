@@ -28,6 +28,7 @@ public:
 	Random() {
 		xorshift64star_x = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
 	}
+	Random(uint64_t seed) : xorshift64star_x(seed) {}
 
 	uint64_t random() {
 		xorshift64star_x ^= xorshift64star_x >> 12; // a

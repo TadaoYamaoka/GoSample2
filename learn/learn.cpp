@@ -7,8 +7,6 @@
 
 using namespace std;
 
-Random random;
-
 typedef unsigned int PatternVal;
 typedef unsigned int HashKey;
 
@@ -23,7 +21,9 @@ HashKey hash_key_pattern_white[HASH_KEY_MAX_PATTERN_COLOR];
 HashKey hash_key_pattern_liberties[HASH_KEY_MAX_PATTERN_LIBERTIES];
 HashKey hash_key_move_pos[5 * 5];
 
-const unsigned int HASH_KEY_MAX = 0x20000000;
+const int HASH_KEY_BIT = 25;
+const int HASH_KEY_MAX = 1 << HASH_KEY_BIT;
+const int HASH_KEY_MASK = HASH_KEY_MAX - 1;
 
 struct ResponsePatternVal
 {
@@ -61,34 +61,36 @@ struct NonResponsePatternVal
 float response_match_weight;
 
 // レスポンスパターンの重み
-float* response_pattern_weight = new float[HASH_KEY_MAX];
+float response_pattern_weight[HASH_KEY_MAX];
 
 // ノンレスポンスパターンの重み
-float* nonresponse_pattern_weight = new float[HASH_KEY_MAX];
+float nonresponse_pattern_weight[HASH_KEY_MAX];
 
 // ハッシュキー衝突検出用
-ResponsePatternVal* response_pattern_collision = new ResponsePatternVal[HASH_KEY_MAX];
-NonResponsePatternVal* nonresponse_pattern_collision = new NonResponsePatternVal[HASH_KEY_MAX];
+ResponsePatternVal response_pattern_collision[HASH_KEY_MAX];
+NonResponsePatternVal nonresponse_pattern_collision[HASH_KEY_MAX];
 ResponsePatternVal response_pattern_collision0 = { 0, 0, 0, 0 };
 NonResponsePatternVal nonresponse_pattern_collision0 = { 0, 0, 0 };
 
 // 各色のパターン用ハッシュキー値生成
 void init_hash_table_and_weight() {
 	// ハッシュテーブル初期化
+	Random random(9977449);
+
 	for (int i = 0; i < HASH_KEY_MAX_PATTERN_COLOR; i++)
 	{
-		hash_key_pattern_black[i] = random.random() % HASH_KEY_MAX;
-		hash_key_pattern_white[i] = random.random() % HASH_KEY_MAX;
+		hash_key_pattern_black[i] = random.random() & HASH_KEY_MASK;
+		hash_key_pattern_white[i] = random.random() & HASH_KEY_MASK;
 	}
 
 	for (int i = 0; i < HASH_KEY_MAX_PATTERN_LIBERTIES; i++)
 	{
-		hash_key_pattern_liberties[i] = random.random() % HASH_KEY_MAX;
+		hash_key_pattern_liberties[i] = random.random() & HASH_KEY_MASK;
 	}
 
 	for (int i = 0; i < sizeof(hash_key_move_pos) / sizeof(hash_key_move_pos[0]); i++)
 	{
-		hash_key_move_pos[i] = random.random() % HASH_KEY_MAX;
+		hash_key_move_pos[i] = random.random() & HASH_KEY_MASK;
 	}
 
 	// 重み初期化
@@ -704,7 +706,7 @@ XY get_xy_from_sgf(char* next)
 	return xy;
 }
 
-inline int get_liberty_val(int liberty_num)
+inline int get_liberty_val(const int liberty_num)
 {
 	return (liberty_num >= 3) ? 3 : liberty_num;
 }
@@ -978,7 +980,7 @@ void learn_pattern_sgf(const wchar_t* infile, int &learned_position_num)
 					else if (response_pattern_collision[response_key] != response_val)
 					{
 						// 衝突
-						assert(false);
+						fprintf(stderr, "collision response pattern\n");
 					}
 
 					// ノンレスポンスパターン
@@ -993,7 +995,7 @@ void learn_pattern_sgf(const wchar_t* infile, int &learned_position_num)
 					else if (nonresponse_pattern_collision[nonresponse_key] != nonresponse_val)
 					{
 						// 衝突
-						assert(false);
+						fprintf(stderr, "collision nonresponse pattern\n");
 					}
 
 					// パラメータ更新準備
