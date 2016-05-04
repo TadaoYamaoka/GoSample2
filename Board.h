@@ -248,5 +248,7 @@ public:
 		return groups[board[xy]];
 	}
 
+	// ƒAƒ^ƒŠ‚ğ•‚¯‚éè‚ğæ“¾
+	int get_atari_save(const Color color, BitBoard<BOARD_BYTE_MAX>& atari_save) const;
 };
 

@@ -13,7 +13,6 @@ extern thread_local Random random;
 extern UCTNode* create_root_node();
 extern UCTNode* create_child_node(const int size);
 
-int get_atari_save(const Board& board, const Color color, BitBoard<BOARD_BYTE_MAX>& atari_save);
 bool is_atari_save_with_ladder_search(const Board& board, const Color color, const XY xy);
 
 // 展開されたノードがアタリを助ける手か調べる
@@ -222,83 +221,6 @@ bool is_atari_save_with_ladder_search(const Board& board, const Color color, con
 	return false;
 }
 
-// アタリを助ける手を取得
-int get_atari_save(const Board& board, const Color color, BitBoard<BOARD_BYTE_MAX>& atari_save)
-{
-	int atari_save_num = 0;
-
-	// 自分の色の連の一覧から呼吸点が1の場所について
-	for (GroupIndex idx = board.groups.begin(); idx != board.groups.end(); idx = board.groups.next(idx))
-	{
-		const Group& group = board.groups[idx];
-
-		// 呼吸点に打った場合に助けることができるか
-		if (group.color == color && group.liberty_num == 1)
-		{
-			// 呼吸点の場所
-			XY xy = group.get_first_liberty();
-
-			int liberty_num = 0;
-			for (XY d : DIR4)
-			{
-				XY xyd = xy + d;
-				if (board.is_empty(xyd))
-				{
-					liberty_num++;
-					continue;
-				}
-				if (board.is_offboard(xyd))
-				{
-					continue;
-				}
-
-				const Group& adjacent_group = board.get_group(xyd);
-				if (adjacent_group.color == color)
-				{
-					if (board.board[xyd] != idx)
-					{
-						// 連結後の呼吸点
-						liberty_num += adjacent_group.liberty_num - 1;
-					}
-				}
-				else
-				{
-					if (adjacent_group.liberty_num == 1)
-					{
-						// 取ることができる
-						liberty_num++;
-					}
-				}
-			}
-			if (liberty_num >= 3)
-			{
-				// アタリを助けた後にも呼吸点が3以上ある(2はシチョウの可能性があるので除外)
-				atari_save.bit_test_and_set(xy);
-			}
-
-			// 隣接する連の呼吸点が1の場合助けることができる
-			GroupIndex group_idx_tmp = 0;
-			for (int j = 0; j < group.adjacent.get_part_size(); j++, group_idx_tmp += BIT)
-			{
-				BitBoardPart adjacent_bitborad = group.adjacent.get_bitboard_part(j);
-				unsigned long idx;
-				while (bit_scan_forward(&idx, adjacent_bitborad))
-				{
-					GroupIndex group_idx = group_idx_tmp + idx;
-					if (board.groups[group_idx].liberty_num == 1)
-					{
-						// 呼吸点の場所
-						atari_save.bit_test_and_set(board.groups[group_idx].get_first_liberty());
-					}
-
-					bit_test_and_reset(&adjacent_bitborad, idx);
-				}
-			}
-		}
-	}
-	return atari_save_num;
-}
-
 // プレイアウト
 int UCTSaveAtari::playout(Board& board, const Color color)
 {
@@ -328,8 +250,7 @@ int UCTSaveAtari::playout(Board& board, const Color color)
 
 		// アタリを助ける手を選ばれやすくする
 		BitBoard<BOARD_BYTE_MAX> atari_save;
-		atari_save.set_all_zero();
-		int atari_save_num = get_atari_save(board, color_tmp, atari_save);
+		int atari_save_num = board.get_atari_save(color_tmp, atari_save);
 		for (int xy = 0, hit_num = 0; hit_num < atari_save_num; xy++)
 		{
 			if (atari_save.bit_test(xy))
