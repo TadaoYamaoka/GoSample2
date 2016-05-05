@@ -1374,6 +1374,73 @@ void check_hash()
 	printf("nonresponse pattern collision num = %d\n", collision_num);
 }
 
+void dump_weight()
+{
+	// 重み順にソート
+	multimap<float, ResponsePatternVal> response_weight_sorted;
+	multimap<float, NonResponsePatternVal> nonresponse_weight_sorted;
+
+	// 重み読み込み
+	FILE* fp_weight = fopen("rollout.bin", "rb");
+	fread(&save_atari_weight, sizeof(save_atari_weight), 1, fp_weight);
+	fread(&neighbour_weight, sizeof(neighbour_weight), 1, fp_weight);
+	fread(&response_match_weight, sizeof(response_match_weight), 1, fp_weight);
+	int num;
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		ResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		response_weight_sorted.insert({ weight, val });
+	}
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		NonResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		nonresponse_weight_sorted.insert({ weight, val });
+	}
+	fclose(fp_weight);
+
+	// 表示
+	printf("response pattern weight output num = %d\n", response_weight_sorted.size());
+	printf("nonresponse pattern weight output num = %d\n", nonresponse_weight_sorted.size());
+
+	printf("save atari weight = %f\n", save_atari_weight);
+	printf("neighbour_weight = %f\n", neighbour_weight);
+	printf("response match weight = %f\n", response_match_weight);
+
+	// Top10
+	printf("Top10\n");
+	int n = 0;
+	for (auto itr = response_weight_sorted.rbegin(); itr != response_weight_sorted.rend() && n < 10; itr++, n++)
+	{
+		printf("response pattern weight : %llx : %f\n", itr->second, itr->first);
+	}
+	n = 0;
+	for (auto itr = nonresponse_weight_sorted.rbegin(); itr != nonresponse_weight_sorted.rend() && n < 10; itr++, n++)
+	{
+		printf("nonresponse pattern weight : %lx : %f\n", itr->second, itr->first);
+	}
+
+	// Top10
+	printf("Bottom10\n");
+	n = 0;
+	for (auto itr = response_weight_sorted.begin(); itr != response_weight_sorted.end() && n < 10; itr++, n++)
+	{
+		printf("response pattern weight : %llx : %f\n", itr->second, itr->first);
+	}
+	n = 0;
+	for (auto itr = nonresponse_weight_sorted.begin(); itr != nonresponse_weight_sorted.end() && n < 10; itr++, n++)
+	{
+		printf("nonresponse pattern weight : %lx : %f\n", itr->second, itr->first);
+	}
+}
+
 int wmain(int argc, wchar_t** argv)
 {
 	if (argc < 3)
@@ -1404,6 +1471,10 @@ int wmain(int argc, wchar_t** argv)
 			check_hash();
 		}
 		check_hash();
+	}
+	else if (wcscmp(argv[1], L"dump") == 0)
+	{
+		dump_weight();
 	}
 
 	return 0;
