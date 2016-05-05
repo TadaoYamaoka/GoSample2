@@ -152,14 +152,17 @@
     <ClInclude Include="Player.h" />
     <ClInclude Include="Random.h" />
     <ClInclude Include="UCTParallel.h" />
+    <ClInclude Include="UCTPattern.h" />
     <ClInclude Include="UCTSample.h" />
     <ClInclude Include="UCTSaveAtari.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Board.cpp" />
     <ClCompile Include="Human.cpp" />
+    <ClCompile Include="learn\Pattern.cpp" />
     <ClCompile Include="Master.cpp" />
     <ClCompile Include="UCTParallel.cpp" />
+    <ClCompile Include="UCTPattern.cpp" />
     <ClCompile Include="UCTSample.cpp" />
     <ClCompile Include="UCTSaveAtari.cpp" />
   </ItemGroup>

@@ -144,7 +144,9 @@
   <ItemGroup>
     <ClCompile Include="..\Board.cpp" />
     <ClCompile Include="..\Human.cpp" />
+    <ClCompile Include="..\learn\Pattern.cpp" />
     <ClCompile Include="..\UCTParallel.cpp" />
+    <ClCompile Include="..\UCTPattern.cpp" />
     <ClCompile Include="..\UCTSample.cpp" />
     <ClCompile Include="..\UCTSaveAtari.cpp" />
     <ClCompile Include="Test.cpp" />

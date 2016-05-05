@@ -6,13 +6,9 @@
 
 #include "../Board.h"
 #include "../Random.h"
+#include "Pattern.h"
 
 using namespace std;
-
-typedef unsigned char PatternVal8;
-typedef unsigned int PatternVal32;
-typedef unsigned long long PatternVal64;
-typedef unsigned int HashKey;
 
 // 学習係数
 float eta = 0.01;
@@ -25,318 +21,6 @@ HashKey hash_key_move_pos[5 * 5];
 const int HASH_KEY_BIT = 24;
 const int HASH_KEY_MAX = 1 << HASH_KEY_BIT;
 const int HASH_KEY_MASK = HASH_KEY_MAX - 1;
-
-struct ResponsePatternVal
-{
-	__declspec(align(8)) struct Vals {
-		PatternVal8 color_liberties[12 / 2];
-		PatternVal8 move_pos;
-	};
-
-	union {
-		PatternVal64 val64;
-		Vals vals;
-	};
-
-	ResponsePatternVal() {}
-
-	ResponsePatternVal(const ResponsePatternVal& val) {
-		val64 = val.val64;
-	}
-
-	ResponsePatternVal(const unsigned long long val64) {
-		this->val64 = val64;
-	}
-
-	ResponsePatternVal(const PatternVal64 color_liberties, const PatternVal8 move_pos) {
-		this->val64 = color_liberties;
-		this->vals.move_pos = move_pos;
-	}
-
-	bool operator ==(const ResponsePatternVal& val) const {
-		return val64 == val.val64;
-	}
-
-	bool operator !=(const ResponsePatternVal& val) const {
-		return val64 != val.val64;
-	}
-
-	bool operator <(const ResponsePatternVal& val) const {
-		return val64 < val.val64;
-	}
-
-	// 90度回転
-	ResponsePatternVal rotate() const {
-		//         [1 ]
-		//     [2 ][3 ][4 ]
-		// [5 ][6 ][  ][7 ][8 ]
-		//     [9 ][10][11]
-		//         [12]
-		// から
-		//         [5 ]
-		//     [9 ][6 ][2 ]
-		// [12][10][  ][3 ][1 ]
-		//     [11][7 ][4 ]
-		//         [8 ]
-
-		ResponsePatternVal rot = 0;
-
-		// 石の色、呼吸点
-		// 1 → 8
-		// 4 → 11
-		rot.val64 |= (val64 & 0b000000000000000000000000000000001111000000001111) << ((8 - 1)/*(11 - 4)*/ * 4);
-		// 2 → 4
-		rot.val64 |= (val64 & 0b000000000000000000000000000000000000000011110000) << ((4 - 2) * 4);
-		// 3 → 7
-		// 8 → 12
-		rot.val64 |= (val64 & 0b000000000000000011110000000000000000111100000000) << ((7 - 3)/*(12 - 8)*/ * 4);
-		// 5 → 1
-		// 10 → 6
-		rot.val64 |= (val64 & 0b000000001111000000000000000011110000000000000000) >> ((5 - 1)/*(10 - 6)*/ * 4);
-		// 6 → 3
-		rot.val64 |= (val64 & 0b000000000000000000000000111100000000000000000000) >> ((6 - 3) * 4);
-		// 7 → 10
-		rot.val64 |= (val64 & 0b000000000000000000001111000000000000000000000000) << ((10 - 7) * 4);
-		// 9 → 2
-		// 12 → 5
-		rot.val64 |= (val64 & 0b111100000000111100000000000000000000000000000000) >> ((9 - 2)/*(12 - 5)*/ * 4);
-		// 11 → 9
-		rot.val64 |= (val64 & 0b000011110000000000000000000000000000000000000000) >> ((11 - 9) * 4);
-
-		// move_pos
-		// [0 ][1 ][2 ][3 ][4 ]
-		// [5 ][6 ][7 ][8 ][9 ]
-		// [10][11][12][13][14]
-		// [15][16][17][18][19]
-		// [20][21][22][23][24]
-		// から
-		// [20][15][10][5 ][0 ]
-		// [21][16][11][6 ][1 ]
-		// [22][17][12][7 ][2 ]
-		// [23][18][13][8 ][3 ]
-		// [24][19][14][9 ][4 ]
-
-		const PatternVal8 rot_tbl[] = { 4, 9, 14, 19, 24, 3, 8, 13, 18, 23, 2, 7, 12, 17, 22, 1, 6, 11, 16, 21, 0, 5, 10, 15, 20 };
-		rot.vals.move_pos |= rot_tbl[vals.move_pos];
-
-		return rot;
-	}
-
-	// 上下反転
-	ResponsePatternVal vmirror() const {
-		//         [1 ]
-		//     [2 ][3 ][4 ]
-		// [5 ][6 ][  ][7 ][8 ]
-		//     [9 ][10][11]
-		//         [12]
-		// から
-		//         [12]
-		//     [9 ][10][11]
-		// [5 ][6 ][  ][7 ][8 ]
-		//     [2 ][3 ][4 ]
-		//         [1 ]
-
-		ResponsePatternVal rot = 0;
-
-		// 石の色
-		// 1 → 12
-		rot.val64 |= (val64 & 0b000000000000000000000000000000000000000000001111) << ((12 - 1) * 4);
-		// 2 → 9
-		// 3 → 10
-		// 4 → 11
-		rot.val64 |= (val64 & 0b000000000000000000000000000000001111111111110000) << ((9 - 2)/*(10 - 3)*//*(11 - 4)*/ * 4);
-		// 9 → 2
-		// 10 → 3
-		// 11 → 4
-		rot.val64 |= (val64 & 0b000011111111111100000000000000000000000000000000) >> ((9 - 2)/*(10 - 3)*//*(11 - 4)*/ * 4);
-		// 12 → 1
-		rot.val64 |= (val64 & 0b111100000000000000000000000000000000000000000000) >> ((12 - 1) * 4);
-
-		// move_pos
-		// [0 ][1 ][2 ][3 ][4 ]
-		// [5 ][6 ][7 ][8 ][9 ]
-		// [10][11][12][13][14]
-		// [15][16][17][18][19]
-		// [20][21][22][23][24]
-		// から
-		// [20][21][22][23][24]
-		// [15][16][17][18][19]
-		// [10][11][12][13][14]
-		// [5 ][6 ][7 ][8 ][9 ]
-		// [0 ][1 ][2 ][3 ][4 ]
-
-		const PatternVal8 mirror_tbl[] = { 20, 21, 22, 23, 24, 15, 16, 17, 18, 19, 10, 11, 12, 13, 14, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4 };
-		rot.vals.move_pos = mirror_tbl[vals.move_pos];
-
-		return rot;
-	}
-
-	// 左右反転
-	ResponsePatternVal hmirror() const {
-		//         [1 ]
-		//     [2 ][3 ][4 ]
-		// [5 ][6 ][  ][7 ][8 ]
-		//     [9 ][10][11]
-		//         [12]
-		// から
-		//         [1 ]
-		//     [4 ][3 ][2 ]
-		// [8 ][7 ][  ][6 ][5 ]
-		//     [11][10][9 ]
-		//         [12]
-
-		ResponsePatternVal rot = 0;
-
-		// 石の色
-		// 2 → 4
-		// 9 → 11
-		rot.val64 |= (val64 & 0b000000000000111100000000000000000000000011110000) >> ((4 - 2)/*(11 - 9)*/ * 4);
-		// 5 → 8
-		rot.val64 |= (val64 & 0b000000000000000000000000000011110000000000000000) >> ((8 - 5) * 4);
-		// 6 → 7
-		rot.val64 |= (val64 & 0b000000000000000000000000111100000000000000000000) >> ((7 - 6) * 4);
-		// 4 → 2
-		// 11 → 9
-		rot.val64 |= (val64 & 0b000011110000000000000000000000001111000000000000) >> ((4 - 2)/*(11 - 9)*/ * 4);
-		// 7 → 6
-		rot.val64 |= (val64 & 0b000000000000000000001111000000000000000000000000) >> ((7 - 6) * 4);
-		// 8 → 5
-		rot.val64 |= (val64 & 0b000000000000000011110000000000000000000000000000) >> ((8 - 5) * 4);
-
-		// move_pos
-		// [0 ][1 ][2 ][3 ][4 ]
-		// [5 ][6 ][7 ][8 ][9 ]
-		// [10][11][12][13][14]
-		// [15][16][17][18][19]
-		// [20][21][22][23][24]
-		// から
-		// [4 ][3 ][2 ][1 ][0 ]
-		// [9 ][8 ][7 ][6 ][5 ]
-		// [14][13][12][11][10]
-		// [19][18][17][16][15]
-		// [24][23][22][21][20]
-
-		const PatternVal8 mirror_tbl[] = { 4, 3, 2, 1, 0, 9, 8, 7, 6, 5, 14, 13, 12, 11, 10, 19, 18, 17, 16, 15, 24, 23, 22, 21, 20 };
-		rot.vals.move_pos = mirror_tbl[vals.move_pos];
-
-		return rot;
-	}
-};
-
-struct NonResponsePatternVal
-{
-	__declspec(align(8)) struct Vals {
-		PatternVal8 color_liberties[8 / 2];
-	};
-
-	union {
-		PatternVal32 val32;
-		Vals vals;
-	};
-
-	NonResponsePatternVal() {}
-
-	NonResponsePatternVal(const NonResponsePatternVal& val) {
-		val32 = val.val32;
-	}
-
-	NonResponsePatternVal(const PatternVal32 val32) {
-		this->val32 = val32;
-	}
-
-	bool operator ==(const NonResponsePatternVal& val) const {
-		return val32 == val.val32;
-	}
-
-	bool operator !=(const NonResponsePatternVal& val) const {
-		return val32 != val.val32;
-	}
-
-	bool operator <(const NonResponsePatternVal& val) const {
-		return val32 < val.val32;
-	}
-
-	// 90度回転
-	NonResponsePatternVal rotate() const {
-		// [1][2][3]
-		// [4][ ][5]
-		// [6][7][8]
-		// から
-		// [6][4][1]
-		// [7][ ][2]
-		// [8][5][3]
-
-		NonResponsePatternVal rot = 0;
-
-		// 石の色
-		// 1 → 3
-		// 5 → 7
-		rot.val32 |= (val32 & 0b00000000000011110000000000001111) << ((3 - 1)/*(7 - 5)*/ * 4);
-		// 2 → 5
-		rot.val32 |= (val32 & 0b00000000000000000000000011110000) << ((5 - 2) * 4);
-		// 3 → 8
-		rot.val32 |= (val32 & 0b00000000000000000000111100000000) << ((8 - 3) * 4);
-		// 4 → 2
-		// 8 → 6
-		rot.val32 |= (val32 & 0b11110000000000001111000000000000) >> ((4 - 2)/*(8 - 6)*/ * 4);
-		// 6 → 1
-		rot.val32 |= (val32 & 0b00000000111100000000000000000000) >> ((6 - 1) * 4);
-		// 7 → 4
-		rot.val32 |= (val32 & 0b00001111000000000000000000000000) >> ((7 - 4) * 4);
-
-		return rot;
-	}
-
-	// 上下反転
-	NonResponsePatternVal vmirror() const {
-		// [1][2][3]
-		// [4][ ][5]
-		// [6][7][8]
-		// から
-		// [6][7][8]
-		// [4][ ][5]
-		// [1][2][3]
-
-		NonResponsePatternVal rot = 0;
-
-		// 1 → 6
-		// 2 → 7
-		// 3 → 8
-		rot.val32 |= (val32 & 0b00000000000000000000111111111111) << ((6 - 1)/*(7 - 2)*//*(8 - 3)*/ * 4);
-		// 6 → 1
-		// 7 → 2
-		// 8 → 3
-		rot.val32 |= (val32 & 0b11111111111100000000000000000000) >> ((6 - 1)/*(7 - 2)*//*(8 - 3)*/ * 4);
-
-		return rot;
-	}
-
-	// 左右反転
-	NonResponsePatternVal hmirror() const {
-		// [1][2][3]
-		// [4][ ][5]
-		// [6][7][8]
-		// から
-		// [3][2][1]
-		// [5][ ][4]
-		// [8][7][6]
-
-		NonResponsePatternVal rot = 0;
-
-		// 1 → 3
-		// 6 → 8
-		rot.val32 |= (val32 & 0b00000000111100000000000000001111) << ((3 - 1)/*(8 - 6)*/ * 4);
-		// 4 → 5
-		rot.val32 |= (val32 & 0b00000000000011110000000000000000) << ((5 - 4) * 4);
-		// 3 → 1
-		// 8 → 6
-		rot.val32 |= (val32 & 0b11110000000000000000111100000000) >> ((3 - 1)/*(8 - 6)*/ * 4);
-		// 5 → 4
-		rot.val32 |= (val32 & 0b00000000000011110000000000000000) >> ((5 - 4) * 4);
-
-		return rot;
-	}
-};
 
 // アタリを防ぐ手の重み
 float save_atari_weight;
@@ -356,8 +40,6 @@ map<NonResponsePatternVal, float> nonresponse_pattern_weight;
 // ハッシュキー衝突検出用
 ResponsePatternVal response_pattern_collision[HASH_KEY_MAX];
 NonResponsePatternVal nonresponse_pattern_collision[HASH_KEY_MAX];
-ResponsePatternVal response_pattern_collision0 = { 0 };
-NonResponsePatternVal nonresponse_pattern_collision0 = { 0 };
 
 // 各色のパターン用ハッシュキー値生成
 void init_hash_table_and_weight(const uint64_t seed) {
@@ -395,63 +77,6 @@ inline HashKey get_hash_key_response_pattern(const ResponsePatternVal& val)
 		^ hash_key_move_pos[val.vals.move_pos];
 }
 
-// レスポンスパターン用ハッシュキー値取得(回転、対称形の最小値)
-HashKey get_hash_key_response_pattern_min(const ResponsePatternVal& val, ResponsePatternVal& min)
-{
-	min = val;
-
-	// 90度回転
-	ResponsePatternVal rot = val.rotate();
-	if (rot < min)
-	{
-		min = rot;
-	}
-
-	// 180度回転
-	rot = rot.rotate();
-	if (rot < min)
-	{
-		min = rot;
-	}
-
-	// 270度回転
-	rot = rot.rotate();
-	if (rot < min)
-	{
-		min = rot;
-	}
-
-	// 上下反転
-	rot = val.vmirror();
-	if (rot < min)
-	{
-		min = rot;
-	}
-
-	// 90度回転
-	rot = rot.rotate();
-	if (rot < min)
-	{
-		min = rot;
-	}
-
-	// 左右反転
-	rot = val.hmirror();
-	if (rot < min)
-	{
-		min = rot;
-	}
-
-	// 90度回転
-	rot = rot.rotate();
-	if (rot < min)
-	{
-		min = rot;
-	}
-
-	return get_hash_key_response_pattern(min);
-}
-
 // ノンレスポンスパターン用ハッシュキー値取得
 HashKey get_hash_key_nonresponse_pattern(const NonResponsePatternVal& val)
 {
@@ -459,63 +84,6 @@ HashKey get_hash_key_nonresponse_pattern(const NonResponsePatternVal& val)
 		^ hash_key_pattern[1][val.vals.color_liberties[1]]
 		^ hash_key_pattern[2][val.vals.color_liberties[2]]
 		^ hash_key_pattern[3][val.vals.color_liberties[3]];
-}
-
-// ノンレスポンスパターン用ハッシュキー値取得(回転、対称形の最小値)
-HashKey get_hash_key_nonresponse_pattern_min(const NonResponsePatternVal& val, NonResponsePatternVal& min)
-{
-	min = val;
-
-	// 90度回転
-	NonResponsePatternVal rot = val.rotate();
-	if (rot < min)
-	{
-		min = rot;
-	}
-
-	// 180度回転
-	rot = rot.rotate();
-	if (rot < min)
-	{
-		min = rot;
-	}
-
-	// 270度回転
-	rot = rot.rotate();
-	if (rot < min)
-	{
-		min = rot;
-	}
-
-	// 上下反転
-	rot = val.vmirror();
-	if (rot < min)
-	{
-		min = rot;
-	}
-
-	// 90度回転
-	rot = rot.rotate();
-	if (rot < min)
-	{
-		min = rot;
-	}
-
-	// 左右反転
-	rot = val.hmirror();
-	if (rot < min)
-	{
-		min = rot;
-	}
-
-	// 90度回転
-	rot = rot.rotate();
-	if (rot < min)
-	{
-		min = rot;
-	}
-
-	return get_hash_key_nonresponse_pattern(min);
 }
 
 bool is_sido(char* next)
@@ -606,185 +174,6 @@ XY get_xy_from_sgf(char* next)
 	return xy;
 }
 
-inline int get_liberty_val(const int liberty_num)
-{
-	return (liberty_num >= 3) ? 3 : liberty_num;
-}
-
-HashKey response_pattern(const Board& board, const XY xy, Color color, ResponsePatternVal& min)
-{
-	// 直前の手の12ポイント範囲内か
-	XY d = xy - board.pre_xy;
-	XY dx = get_x(d);
-	XY dy = get_y(d);
-	if (abs(dx) + abs(dy) > 2)
-	{
-		return 0;
-	}
-
-	// 黒を基準にする
-	PatternVal64 color_mask = (color == BLACK) ? 0 : 0b11;
-
-	ResponsePatternVal val = { 0 };
-
-	// 1段目
-	XY xyp = board.pre_xy - BOARD_WIDTH * 2;
-	if (xyp > BOARD_WIDTH && !board.is_empty(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val64 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2));
-	}
-
-	// 2段目
-	xyp = board.pre_xy - BOARD_WIDTH - 1;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val64 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 1);
-	}
-	xyp++;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val64 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 2);
-	}
-	xyp++;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val64 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 3);
-	}
-
-	// 3段目
-	xyp = board.pre_xy - 2;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp) && !board.is_offboard(xyp + 1))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val64 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 4);
-	}
-	xyp++;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val64 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 5);
-	}
-	xyp += 2;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val64 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 6);
-	}
-	xyp++;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp) && !board.is_offboard(xyp - 1))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val64 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 7);
-	}
-
-	// 4段目
-	xyp = board.pre_xy + BOARD_WIDTH - 1;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val64 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 8);
-	}
-	xyp++;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val64 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 9);
-	}
-	xyp++;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val64 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 10);
-	}
-
-	// 5段目
-	xyp = board.pre_xy + BOARD_WIDTH * 2;
-	if (xyp < BOARD_MAX - BOARD_WIDTH && !board.is_empty(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val64 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 11);
-	}
-
-	val.vals.move_pos = (dy + 2) * 5 + (dx + 2);
-	return get_hash_key_response_pattern_min(val, min);
-}
-
-HashKey nonresponse_pattern(const Board& board, const XY xy, Color color, NonResponsePatternVal& min)
-{
-	// 黒を基準にする
-	PatternVal32 color_mask = (color == BLACK) ? 0 : 0b11;
-
-	NonResponsePatternVal val = { 0 };
-
-	 // 1段目
-	XY xyp = xy - BOARD_WIDTH - 1;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2));
-	}
-	xyp++;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 1);
-	}
-	xyp++;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 2);
-	}
-
-	// 2段目
-	xyp = xy - 1;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 3);
-	}
-	xyp += 2;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 4);
-	}
-
-	// 3段目
-	xyp = xy + BOARD_WIDTH - 1;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 5);
-	}
-	xyp++;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 6);
-	}
-	xyp++;
-	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
-	{
-		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 7);
-	}
-
-	return get_hash_key_nonresponse_pattern_min(val, min);
-}
-
-bool is_neighbour(const Board& board, XY xy)
-{
-	XY dx = get_x(xy) - get_x(board.pre_xy);
-	XY dy = get_y(xy) - get_y(board.pre_xy);
-
-	return abs(dx) <= 1 && abs(dy) <= 1;
-}
-
 int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num)
 {
 	FILE* fp = _wfopen(infile, L"r");
@@ -858,12 +247,10 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num)
 				{
 					// 候補手パターン
 					// レスポンスパターン
-					ResponsePatternVal response_val = { 0 };
-					response_pattern(board, txy, color, response_val);
+					ResponsePatternVal response_val = response_pattern(board, txy, color);
 
 					// ノンレスポンスパターン
-					NonResponsePatternVal nonresponse_val = { 0 };
-					nonresponse_pattern(board, txy, color, nonresponse_val);
+					NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, txy, color);
 
 					// パラメータ更新準備
 					// 重みの線形和
@@ -1178,16 +565,14 @@ int prepare_pattern_sgf(const wchar_t* infile, map<ResponsePatternVal, int>& res
 				{
 					// 候補手パターン
 					// レスポンスパターン
-					ResponsePatternVal response_val = response_pattern_collision0;
-					response_pattern(board, txy, color, response_val);
-					if (response_val != response_pattern_collision0)
+					ResponsePatternVal response_val = response_pattern(board, txy, color);
+					if (response_val != 0)
 					{
 						response_pattern_map[response_val]++;
 					}
 
 					// ノンレスポンスパターン
-					NonResponsePatternVal nonresponse_val = nonresponse_pattern_collision0;
-					nonresponse_pattern(board, txy, color, nonresponse_val);
+					NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, txy, color);
 					nonresponse_pattern_map[nonresponse_val]++;
 				}
 			}

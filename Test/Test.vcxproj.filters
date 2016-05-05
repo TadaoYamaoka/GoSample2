@@ -36,5 +36,11 @@
     <ClCompile Include="..\UCTSaveAtari.cpp">
       <Filter>ソース ファイル\target</Filter>
     </ClCompile>
+    <ClCompile Include="..\UCTPattern.cpp">
+      <Filter>ソース ファイル\target</Filter>
+    </ClCompile>
+    <ClCompile Include="..\learn\Pattern.cpp">
+      <Filter>ソース ファイル\target</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

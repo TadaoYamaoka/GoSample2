@@ -1,6 +1,5 @@
-#include <future>
+#include "UCTPattern.h"
 #include "Random.h"
-#include "UCTSaveAtari.h"
 
 #ifndef _DEBUG
 const int THREAD_NUM = 8; // 論理コア数
@@ -13,19 +12,59 @@ extern thread_local Random random;
 extern UCTNode* create_root_node();
 extern UCTNode* create_child_node(const int size);
 
-// 展開されたノードがアタリを助ける手か調べる
-void check_atari_save(const Board& board, const Color color, UCTNode* node)
+extern void check_atari_save(const Board& board, const Color color, UCTNode* node);
+
+// アタリを防ぐ手の重み
+float save_atari_weight;
+
+// 直前の手と隣接
+float neighbour_weight;
+
+// レスポンスマッチの重み
+float response_match_weight;
+
+// レスポンスパターンの重み
+map<ResponsePatternVal, float> response_pattern_weight;
+
+// ノンレスポンスパターンの重み
+map<NonResponsePatternVal, float> nonresponse_pattern_weight;
+
+void load_weight(const char* filepath)
 {
-	for (int i = 0; i < node->child_num; i++)
+	// 重み読み込み
+	FILE* fp_weight = fopen(filepath, "rb");
+	fread(&save_atari_weight, sizeof(save_atari_weight), 1, fp_weight);
+	fread(&neighbour_weight, sizeof(neighbour_weight), 1, fp_weight);
+	fread(&response_match_weight, sizeof(response_match_weight), 1, fp_weight);
+	int num;
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
 	{
-		node->child[i].is_atari_save = board.is_atari_save_with_ladder_search(color, node->child[i].xy);
+		ResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		response_pattern_weight.insert({ val, weight });
 	}
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		NonResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		nonresponse_pattern_weight.insert({ val, weight });
+	}
+	fclose(fp_weight);
 }
 
 // プレイアウト
-int UCTSaveAtari::playout(Board& board, const Color color)
+int UCTPattern::playout(Board& board, const Color color)
 {
 	int possibles[BOARD_SIZE_MAX * BOARD_SIZE_MAX]; // 動的に確保しない
+	int e_weight[BOARD_SIZE_MAX * BOARD_SIZE_MAX];
+
+	static BitBoard<BOARD_BYTE_MAX> atari_save;
 
 	// 終局までランダムに打つ
 	Color color_tmp = color;
@@ -34,69 +73,82 @@ int UCTSaveAtari::playout(Board& board, const Color color)
 	{
 		int selected_xy;
 		int selected_i = -1;
+		int e_weight_sum = 0;
 
-		// 候補手一覧
+		// アタリを助ける手
+		board.get_atari_save(color, atari_save);
+
+		// 候補手一覧(合法手のみ)
 		int possibles_num = 0;
 		for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
 		{
 			for (XY x = 1; x <= BOARD_SIZE; x++)
 			{
 				XY xy = y + x;
-				if (board.is_empty(xy))
+				if (board.is_empty(xy) && board.is_legal(xy, color_tmp) == SUCCESS)
 				{
-					possibles[possibles_num++] = xy;
+					possibles[possibles_num] = xy;
+
+					// 確率算出
+					ResponsePatternVal response_val = response_pattern(board, xy, color);
+					NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, xy, color);
+
+					// 重みの線形和
+					float weight_sum = nonresponse_pattern_weight[nonresponse_val];
+					if (response_val != 0)
+					{
+						weight_sum += response_match_weight;
+						weight_sum += response_pattern_weight[response_val];
+					}
+					// アタリを助ける手か
+					if (atari_save.bit_test(xy))
+					{
+						weight_sum += save_atari_weight;
+					}
+					// 直前の手に隣接する手か
+					if (is_neighbour(board, xy))
+					{
+						weight_sum += neighbour_weight;
+					}
+
+					// 各手のsoftmaxを計算
+					e_weight[possibles_num] = expf(weight_sum) * 1000; // 1000倍して整数にする
+					e_weight_sum += e_weight[possibles_num];
+
+					possibles_num++;
 				}
 			}
 		}
 
-		// アタリを助ける手を選ばれやすくする
-		BitBoard<BOARD_BYTE_MAX> atari_save;
-		int atari_save_num = board.get_atari_save(color_tmp, atari_save);
-		for (int xy = 0, hit_num = 0; hit_num < atari_save_num; xy++)
+		if (possibles_num == 0)
 		{
-			if (atari_save.bit_test(xy))
+			// 合法手がない場合、パス
+			selected_xy = PASS;
+		}
+		else
+		{
+			// 確率に応じて手を選択
+			selected_xy = possibles[possibles_num - 1];
+			int e_weight_tmp = 0;
+			int r = random.random() % e_weight_sum;
+			for (int i = 0; i < possibles_num - 1; i++)
 			{
-				if (random.random() < RANDOM_MAX / 2 / atari_save_num)
+				e_weight_tmp += e_weight[i];
+				if (r < e_weight_tmp)
 				{
-					selected_i = possibles_num;
-					selected_xy = xy;
+					selected_xy = possibles[i];
 					break;
 				}
 			}
 		}
 
-		if (selected_i == -1)
+		// 石を打つ(合法手)
+		board.move_legal(selected_xy, color_tmp);
+
+		// 連続パスで終了
+		if (selected_xy == PASS && pre_xy == PASS)
 		{
-			while (true)
-			{
-				if (possibles_num == 0)
-				{
-					selected_xy = PASS;
-				}
-				else {
-					// ランダムで手を選ぶ
-					selected_i = random.random() % possibles_num;
-					selected_xy = possibles[selected_i];
-				}
-
-				// 石を打つ
-				MoveResult err = board.move(selected_xy, color_tmp);
-
-				if (err == SUCCESS)
-				{
-					break;
-				}
-
-				// 手を削除
-				possibles[selected_i] = possibles[possibles_num - 1];
-				possibles_num--;
-			}
-
-			// 連続パスで終了
-			if (selected_xy == PASS && pre_xy == PASS)
-			{
-				break;
-			}
+			break;
 		}
 
 		// 一つ前の手を保存
@@ -118,7 +170,7 @@ int UCTSaveAtari::playout(Board& board, const Color color)
 }
 
 // UCBからプレイアウトする手を選択
-UCTNode* UCTSaveAtari::select_node_with_ucb(const Board& board, const Color color, UCTNode* node)
+UCTNode* UCTPattern::select_node_with_ucb(const Board& board, const Color color, UCTNode* node)
 {
 	UCTNode* selected_node;
 	double max_ucb = -999;
@@ -159,7 +211,7 @@ UCTNode* UCTSaveAtari::select_node_with_ucb(const Board& board, const Color colo
 }
 
 // UCT
-int UCTSaveAtari::search_uct(Board& board, const Color color, UCTNode* node)
+int UCTPattern::search_uct(Board& board, const Color color, UCTNode* node)
 {
 	// UCBからプレイアウトする手を選択
 	UCTNode* selected_node;
@@ -214,7 +266,7 @@ int UCTSaveAtari::search_uct(Board& board, const Color color, UCTNode* node)
 	return win;
 }
 
-void UCTSaveAtari::search_uct_root(Board& board, const Color color, UCTNode* node, const std::map<UCTNode*, UCTNode*>& copynodemap)
+void UCTPattern::search_uct_root(Board& board, const Color color, UCTNode* node, const std::map<UCTNode*, UCTNode*>& copynodemap)
 {
 	// UCBからプレイアウトする手を選択
 	// rootノードはアトミックに更新するためUCB計算ではロックしない
@@ -260,7 +312,7 @@ void UCTSaveAtari::search_uct_root(Board& board, const Color color, UCTNode* nod
 	_InterlockedIncrement(&node->playout_num_sum);
 }
 
-XY UCTSaveAtari::select_move(Board& board, Color color)
+XY UCTPattern::select_move(Board& board, Color color)
 {
 	UCTNode* root = create_root_node();
 	this->root = root;

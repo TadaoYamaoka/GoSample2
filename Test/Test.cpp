@@ -5,8 +5,9 @@
 #include "../UCTSample.h"
 #include "../UCTParallel.h"
 #include "../UCTSaveAtari.h"
+#include "../UCTPattern.h";
 
-UCTSaveAtari player;
+UCTPattern player;
 
 void init_board(Board& board, Color* test_board, const int boardsize)
 {
@@ -162,8 +163,6 @@ void test_004()
 
 void test_ladder_search_001()
 {
-	extern bool ladder_search(const Board& board, const Color color, const XY xy, Color tmp_board[BOARD_BYTE_MAX], XY liberties[4], const int depth);
-
 	// シチョウ判定
 	Color test_board[] = {
 	//  1  2  3  4  5  6  7  8  9
@@ -184,15 +183,13 @@ void test_ladder_search_001()
 	Color tmp_board[BOARD_BYTE_MAX] = { 0 };
 	XY liberties[4] = { get_xy(6, 1), get_xy(7, 2), 0, 0 };
 
-	bool is_ladder = ladder_search(board, BLACK, get_xy(6, 2), tmp_board, liberties, 5);
+	bool is_ladder = Board::ladder_search(board, BLACK, get_xy(6, 2), tmp_board, liberties, 5);
 
 	assert(is_ladder, true);
 }
 
 void test_ladder_search_002()
 {
-	extern bool ladder_search(const Board& board, const Color color, const XY xy, Color tmp_board[BOARD_BYTE_MAX], XY liberties[4], const int depth);
-
 	// シチョウ判定
 	Color test_board[] = {
 	//  1  2  3  4  5  6  7  8  9
@@ -213,15 +210,13 @@ void test_ladder_search_002()
 	Color tmp_board[BOARD_BYTE_MAX] = { 0 };
 	XY liberties[4] = { get_xy(6, 1), get_xy(7, 2), 0, 0 };
 
-	bool is_ladder = ladder_search(board, BLACK, get_xy(6, 2), tmp_board, liberties, 5);
+	bool is_ladder = Board::ladder_search(board, BLACK, get_xy(6, 2), tmp_board, liberties, 5);
 
 	assert(is_ladder, true);
 }
 
 void test_ladder_search_003()
 {
-	extern bool ladder_search(const Board& board, const Color color, const XY xy, Color tmp_board[BOARD_BYTE_MAX], XY liberties[4], const int depth);
-
 	// シチョウ判定
 	Color test_board[] = {
 	//  1  2  3  4  5  6  7  8  9
@@ -242,7 +237,7 @@ void test_ladder_search_003()
 	Color tmp_board[BOARD_BYTE_MAX] = { 0 };
 	XY liberties[4] = { get_xy(5, 2), get_xy(6, 3), 0, 0 };
 
-	bool is_ladder = ladder_search(board, BLACK, get_xy(5, 3), tmp_board, liberties, 5);
+	bool is_ladder = Board::ladder_search(board, BLACK, get_xy(5, 3), tmp_board, liberties, 5);
 
 	assert(is_ladder, false);
 }
@@ -365,16 +360,18 @@ void test_ladder_search_007()
 
 int main()
 {
-	test_001();
-	test_002();
+	load_weight("../learn/rollout.bin");
+
+	//test_001();
+	//test_002();
 	test_003();
-	test_004();
-	test_ladder_search_001();
-	test_ladder_search_002();
-	test_ladder_search_003();
-	test_ladder_search_004();
-	test_ladder_search_005();
-	test_ladder_search_006();
-	test_ladder_search_007();
+	//test_004();
+	//test_ladder_search_001();
+	//test_ladder_search_002();
+	//test_ladder_search_003();
+	//test_ladder_search_004();
+	//test_ladder_search_005();
+	//test_ladder_search_006();
+	//test_ladder_search_007();
 	return 0;
 }

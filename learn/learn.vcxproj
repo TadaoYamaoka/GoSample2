@@ -21,6 +21,10 @@
   <ItemGroup>
     <ClCompile Include="..\Board.cpp" />
     <ClCompile Include="learn.cpp" />
+    <ClCompile Include="Pattern.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Pattern.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{092C9016-716A-40CD-BD0B-BD297BA6BBC4}</ProjectGuid>

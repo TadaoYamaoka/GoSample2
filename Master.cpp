@@ -6,12 +6,13 @@
 #include "UCTSample.h"
 #include "UCTParallel.h"
 #include "UCTSaveAtari.h"
+#include "UCTPattern.h"
 #include "Human.h"
 
 using namespace std;
 
 // プレイヤー一覧
-Player* playerList[] = {new UCTSample(), new UCTParallel(), new UCTSaveAtari(), new Human()};
+Player* playerList[] = {new UCTSample(), new UCTParallel(), new UCTSaveAtari(), new UCTPattern(), new Human()};
 
 static bool isPalying = false;
 static Board board;
@@ -62,6 +63,8 @@ void print_sfg();
 #ifndef TEST
 int wmain(int argc, wchar_t* argv[]) {
 	::hInstance = GetModuleHandle(NULL);
+
+	load_weight("learn/rollout.bin");
 
 	// オプション
 	for (int i = 0; i < argc; i++)
