@@ -61,8 +61,11 @@ void load_weight(const char* filepath)
 // プレイアウト
 int UCTPattern::playout(Board& board, const Color color)
 {
-	int possibles[BOARD_SIZE_MAX * BOARD_SIZE_MAX]; // 動的に確保しない
-	int e_weight[BOARD_SIZE_MAX * BOARD_SIZE_MAX];
+	struct Possible
+	{
+		XY xy;
+		int e_weight;
+	} possibles[BOARD_SIZE_MAX * BOARD_SIZE_MAX]; // 動的に確保しない
 
 	static BitBoard<BOARD_BYTE_MAX> atari_save;
 
@@ -87,8 +90,6 @@ int UCTPattern::playout(Board& board, const Color color)
 				XY xy = y + x;
 				if (board.is_empty(xy) && board.is_legal(xy, color_tmp) == SUCCESS)
 				{
-					possibles[possibles_num] = xy;
-
 					// 確率算出
 					ResponsePatternVal response_val = response_pattern(board, xy, color);
 					NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, xy, color);
@@ -97,7 +98,7 @@ int UCTPattern::playout(Board& board, const Color color)
 					float weight_sum = nonresponse_pattern_weight[nonresponse_val];
 					if (response_val != 0)
 					{
-						weight_sum += response_match_weight;
+						//weight_sum += response_match_weight;
 						weight_sum += response_pattern_weight[response_val];
 					}
 					// アタリを助ける手か
@@ -112,8 +113,11 @@ int UCTPattern::playout(Board& board, const Color color)
 					}
 
 					// 各手のsoftmaxを計算
-					e_weight[possibles_num] = expf(weight_sum) * 1000; // 1000倍して整数にする
-					e_weight_sum += e_weight[possibles_num];
+					int e_weight = expf(weight_sum) * 1000; // 1000倍して整数にする
+					e_weight_sum += e_weight;
+
+					possibles[possibles_num].xy = xy;
+					possibles[possibles_num].e_weight = e_weight;
 
 					possibles_num++;
 				}
@@ -128,15 +132,15 @@ int UCTPattern::playout(Board& board, const Color color)
 		else
 		{
 			// 確率に応じて手を選択
-			selected_xy = possibles[possibles_num - 1];
+			selected_xy = possibles[possibles_num - 1].xy;
 			int e_weight_tmp = 0;
 			int r = random.random() % e_weight_sum;
 			for (int i = 0; i < possibles_num - 1; i++)
 			{
-				e_weight_tmp += e_weight[i];
+				e_weight_tmp += possibles[i].e_weight;
 				if (r < e_weight_tmp)
 				{
-					selected_xy = possibles[i];
+					selected_xy = possibles[i].xy;
 					break;
 				}
 			}
