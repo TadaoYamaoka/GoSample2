@@ -74,13 +74,13 @@ int UCTPattern::playout(Board& board, const Color color)
 		// 直前に変更のあった連の周辺の評価値を初期化する
 		for (int i = 0; i < board.pre_changed_group_num; i++)
 		{
-			Group& changed_group = board.groups[board.pre_changed_group[i]];
+			const Group& changed_group = board.groups[board.pre_changed_group[i]];
 			for (int j = 0; j < changed_group.stone_num; j++)
 			{
-				XY xy = changed_group.stone[j];
+				const XY xy = changed_group.stone[j];
 
-				XY x = get_x(xy);
-				XY y = get_y(xy);
+				const XY x = get_x(xy);
+				const XY y = get_y(xy);
 				XY x_min = x - 2;
 				if (x_min < 1)
 				{
@@ -117,7 +117,7 @@ int UCTPattern::playout(Board& board, const Color color)
 		{
 			for (XY x = 1; x <= BOARD_SIZE; x++)
 			{
-				XY xy = y + x;
+				const XY xy = y + x;
 				if (board.is_empty(xy))
 				{
 					float weight_sum;
@@ -128,8 +128,8 @@ int UCTPattern::playout(Board& board, const Color color)
 					// 初回もしくは直前に変更のあった連の周辺のみ更新する
 					if (non_response_weight_board[xy] == 0)
 					{
-						NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, xy, color);
-						auto itr = rpw.nonresponse_pattern_weight.find(nonresponse_val);
+						const NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, xy, color);
+						const auto itr = rpw.nonresponse_pattern_weight.find(nonresponse_val);
 						if (itr != rpw.nonresponse_pattern_weight.end())
 						{
 							non_response_weight_board[xy] = itr->second;
@@ -138,11 +138,11 @@ int UCTPattern::playout(Board& board, const Color color)
 					weight_sum = non_response_weight_board[xy];
 
 					// Response pattern
-					ResponsePatternVal response_val = response_pattern(board, xy, color);
+					const ResponsePatternVal response_val = response_pattern(board, xy, color);
 					if (response_val != 0)
 					{
 						//weight_sum += response_match_weight;
-						auto itr = rpw.response_pattern_weight.find(response_val);
+						const auto itr = rpw.response_pattern_weight.find(response_val);
 						if (itr != rpw.response_pattern_weight.end())
 						{
 							weight_sum += itr->second;
@@ -161,7 +161,7 @@ int UCTPattern::playout(Board& board, const Color color)
 					}
 
 					// 各手のsoftmaxを計算
-					int e_weight = expf(weight_sum) * 1000; // 1000倍して整数にする
+					const int e_weight = expf(weight_sum) * 1000; // 1000倍して整数にする
 					e_weight_sum += e_weight;
 
 					possibles[possibles_num].xy = xy;
@@ -199,7 +199,7 @@ int UCTPattern::playout(Board& board, const Color color)
 			}
 
 			// 石を打つ
-			MoveResult err = board.move(selected_xy, color_tmp);
+			const MoveResult err = board.move(selected_xy, color_tmp);
 
 			if (err == SUCCESS)
 			{
@@ -225,7 +225,7 @@ int UCTPattern::playout(Board& board, const Color color)
 	}
 
 	// 終局 勝敗を返す
-	Color win = end_game(board);
+	const Color win = end_game(board);
 	if (win == color)
 	{
 		return 1;
