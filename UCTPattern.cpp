@@ -69,7 +69,7 @@ int UCTPattern::playout(Board& board, const Color color)
 		int e_weight_sum = 0;
 
 		// アタリを助ける手
-		board.get_atari_save(color, atari_save);
+		board.get_atari_save(color_tmp, atari_save);
 
 		// 直前に変更のあった連の周辺の評価値を初期化する
 		for (int i = 0; i < board.pre_changed_group_num; i++)
@@ -128,7 +128,7 @@ int UCTPattern::playout(Board& board, const Color color)
 					// 初回もしくは直前に変更のあった連の周辺のみ更新する
 					if (non_response_weight_board[xy] == 0)
 					{
-						const NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, xy, color);
+						const NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, xy, color_tmp);
 						const auto itr = rpw.nonresponse_pattern_weight.find(nonresponse_val);
 						if (itr != rpw.nonresponse_pattern_weight.end())
 						{
@@ -138,7 +138,7 @@ int UCTPattern::playout(Board& board, const Color color)
 					weight_sum = non_response_weight_board[xy];
 
 					// Response pattern
-					const ResponsePatternVal response_val = response_pattern(board, xy, color);
+					const ResponsePatternVal response_val = response_pattern(board, xy, color_tmp);
 					if (response_val != 0)
 					{
 						//weight_sum += response_match_weight;
