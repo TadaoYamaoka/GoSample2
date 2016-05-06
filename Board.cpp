@@ -9,6 +9,8 @@ XY DIR4[4];
 
 MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 {
+	pre_changed_group_num = 0;
+
 	// パスの場合
 	if (xy == PASS) {
 		ko = -1;
@@ -112,6 +114,9 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 
 		// 石の数を加算
 		stone_num[color]++;
+
+		// 変更した連に追加
+		pre_changed_group[pre_changed_group_num++] = idx;
 	}
 	else
 	{
@@ -124,6 +129,9 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 
 		// 石の数を加算
 		stone_num[color]++;
+
+		// 変更した連に追加
+		pre_changed_group[pre_changed_group_num++] = around_group_self[0];
 
 		for (int i = 1; i < around_group_self_num; i++)
 		{
@@ -140,6 +148,9 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 
 			// 連を削除
 			remove_group(around_group_self[i]);
+
+			// 変更した連に追加
+			pre_changed_group[pre_changed_group_num++] = around_group_self[i];
 		}
 	}
 
@@ -163,6 +174,11 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 					if (groups[board[xyd]].color == color)
 					{
 						groups[board[xyd]].add_liberty(xyr);
+						if (pre_changed_group[pre_changed_group_num - 1] != board[xyd])
+						{
+							// 変更した連に追加
+							pre_changed_group[pre_changed_group_num++] = board[xyd];
+						}
 					}
 				}
 			}
@@ -187,6 +203,9 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 
 		// 連を削除
 		remove_group(around_group_capture[i]);
+
+		// 変更した連に追加
+		pre_changed_group[pre_changed_group_num++] = around_group_capture[i];
 	}
 
 	// 隣接する敵の連について
@@ -200,6 +219,9 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 
 		// 敵の連にも自分を隣接する連として追加
 		groups[around_group_oponnent[i]].adjacent.bit_test_and_set(board[xy]);
+
+		// 変更した連に追加
+		pre_changed_group[pre_changed_group_num++] = around_group_oponnent[i];
 	}
 
 	// コウ
@@ -365,6 +387,9 @@ void Board::move_legal(const XY xy, const Color color)
 
 		// 石の数を加算
 		stone_num[color]++;
+
+		// 変更した連に追加
+		pre_changed_group[pre_changed_group_num++] = idx;
 	}
 	else
 	{
@@ -377,6 +402,9 @@ void Board::move_legal(const XY xy, const Color color)
 
 		// 石の数を加算
 		stone_num[color]++;
+
+		// 変更した連に追加
+		pre_changed_group[pre_changed_group_num++] = around_group_self[0];
 
 		for (int i = 1; i < around_group_self_num; i++)
 		{
@@ -393,6 +421,9 @@ void Board::move_legal(const XY xy, const Color color)
 
 			// 連を削除
 			remove_group(around_group_self[i]);
+
+			// 変更した連に追加
+			pre_changed_group[pre_changed_group_num++] = around_group_self[i];
 		}
 	}
 
@@ -416,6 +447,11 @@ void Board::move_legal(const XY xy, const Color color)
 					if (groups[board[xyd]].color == color)
 					{
 						groups[board[xyd]].add_liberty(xyr);
+						if (pre_changed_group[pre_changed_group_num - 1] != board[xyd])
+						{
+							// 変更した連に追加
+							pre_changed_group[pre_changed_group_num++] = board[xyd];
+						}
 					}
 				}
 			}
@@ -440,6 +476,9 @@ void Board::move_legal(const XY xy, const Color color)
 
 		// 連を削除
 		remove_group(around_group_capture[i]);
+
+		// 変更した連に追加
+		pre_changed_group[pre_changed_group_num++] = around_group_capture[i];
 	}
 
 	// 隣接する敵の連について
@@ -453,6 +492,9 @@ void Board::move_legal(const XY xy, const Color color)
 
 		// 敵の連にも自分を隣接する連として追加
 		groups[around_group_oponnent[i]].adjacent.bit_test_and_set(board[xy]);
+
+		// 変更した連に追加
+		pre_changed_group[pre_changed_group_num++] = around_group_oponnent[i];
 	}
 
 	// コウ

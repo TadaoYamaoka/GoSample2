@@ -67,7 +67,10 @@ int UCTPattern::playout(Board& board, const Color color)
 		int e_weight;
 	} possibles[BOARD_SIZE_MAX * BOARD_SIZE_MAX]; // 動的に確保しない
 
-	static BitBoard<BOARD_BYTE_MAX> atari_save;
+	BitBoard<BOARD_BYTE_MAX> atari_save;
+
+	// Non-responseパターン評価値(保存用)
+	float non_response_weight_board[BOARD_BYTE_MAX] = { 0 };
 
 	// 終局までランダムに打つ
 	Color color_tmp = color;
@@ -80,6 +83,24 @@ int UCTPattern::playout(Board& board, const Color color)
 		// アタリを助ける手
 		board.get_atari_save(color, atari_save);
 
+		// 直前に変更のあった連の周辺の評価値を初期化する
+		for (int i = 0; i < board.pre_changed_group_num; i++)
+		{
+			Group& changed_group = board.groups[board.pre_changed_group[i]];
+			for (int j = 0; j < changed_group.stone_num; j++)
+			{
+				XY xy = changed_group.stone[j];
+				non_response_weight_board[xy] = 0;
+
+				const XY DIR8[] = { -BOARD_WIDTH - 1, -BOARD_WIDTH, -BOARD_WIDTH + 1, -1, 1, BOARD_WIDTH - 1, BOARD_WIDTH, BOARD_WIDTH + 1 };
+				for (XY d : DIR8)
+				{
+					XY xyd = xy + d;
+					non_response_weight_board[xyd] = 0;
+				}
+			}
+		}
+
 		// 候補手一覧(合法手チェックなし)
 		int possibles_num = 0;
 		for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
@@ -89,12 +110,21 @@ int UCTPattern::playout(Board& board, const Color color)
 				XY xy = y + x;
 				if (board.is_empty(xy))
 				{
+					float weight_sum;
 					// 確率算出
-					ResponsePatternVal response_val = response_pattern(board, xy, color);
-					NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, xy, color);
 
 					// 重みの線形和
-					float weight_sum = nonresponse_pattern_weight[nonresponse_val];
+					// Non-response pattern
+					// 初回もしくは直前に変更のあった連の周辺のみ更新する
+					if (non_response_weight_board[xy] == 0)
+					{
+						NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, xy, color);
+						non_response_weight_board[xy] = nonresponse_pattern_weight[nonresponse_val];
+					}
+					weight_sum = non_response_weight_board[xy];
+
+					// Response pattern
+					ResponsePatternVal response_val = response_pattern(board, xy, color);
 					if (response_val != 0)
 					{
 						//weight_sum += response_match_weight;

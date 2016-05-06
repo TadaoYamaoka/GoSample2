@@ -97,6 +97,7 @@ Color UCTSample::end_game(const Board& board)
 	}
 
 	//debug_print_board(board);
+	//printf("black = %d, white = %d, score = %d\n", board.stone_num[BLACK], board.stone_num[WHITE], score);
 
 	// Šá‚ğ”‚¦‚é
 	for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
@@ -104,6 +105,11 @@ Color UCTSample::end_game(const Board& board)
 		for (XY x = 1; x <= BOARD_SIZE; x++)
 		{
 			XY xy = y + x;
+			if (!board.is_empty(xy))
+			{
+				continue;
+			}
+
 			int mk[] = { 0, 0, 0, 0 }; // ŠeF‚Ì4•ûŒü‚ÌÎ‚Ì”
 			for (int d : DIR4)
 			{

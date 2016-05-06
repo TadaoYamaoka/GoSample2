@@ -7,7 +7,7 @@
 #include "../UCTSaveAtari.h"
 #include "../UCTPattern.h";
 
-UCTPattern player;
+UCTSample player;
 
 void init_board(Board& board, Color* test_board, const int boardsize)
 {
@@ -159,6 +159,34 @@ void test_004()
 
 	// 9,7‚ÍNG
 	assert_not(xy, get_xy(9, 7));
+}
+
+void test_005()
+{
+	// •‰‚¯‚È‚Ì‚ÉŸ‚¿‚Æ”»’è
+
+	Color test_board[] = {
+	//  1  2  3  4  5  6  7  8  9
+		1, 1, 2, 2, 0, 1, 2, 2, 0, // 1
+		1, 1, 2, 2, 2, 2, 0, 2, 2, // 2 
+		1, 1, 1, 2, 0, 0, 0, 2, 1, // 3
+		0, 1, 2, 2, 2, 0, 2, 2, 0, // 4
+		1, 1, 1, 1, 2, 2, 1, 2, 0, // 5
+		0, 0, 0, 1, 2, 1, 1, 2, 2, // 6
+		0, 1, 1, 0, 1, 0, 1, 1, 2, // 7
+		0, 1, 1, 0, 1, 0, 1, 2, 2, // 8
+		0, 1, 1, 1, 1, 1, 1, 1, 2  // 9
+	};
+	Board board(9);
+	init_board(board, test_board, 9);
+	debug_print_board(board);
+
+	XY xy = player.select_move(board, BLACK);
+
+	print_child(player.root);
+	printf("xy = %d, x,y = %d,%d\n", xy, get_x(xy), get_y(xy));
+
+	assert(xy, PASS);
 }
 
 void test_ladder_search_001()
@@ -366,6 +394,7 @@ int main()
 	test_002();
 	test_003();
 	test_004();
+	test_005();
 	//test_ladder_search_001();
 	//test_ladder_search_002();
 	//test_ladder_search_003();

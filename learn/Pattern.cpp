@@ -67,6 +67,11 @@ ResponsePatternVal get_response_pattern_key_min(const ResponsePatternVal& val)
 // ノンレスポンスパターン値取得(回転、対称形の最小値)
 NonResponsePatternVal get_nonresponse_pattern_key_min(const NonResponsePatternVal& val)
 {
+	if (val == 0)
+	{
+		return 0;
+	}
+
 	NonResponsePatternVal min = val;
 
 	// 90度回転
