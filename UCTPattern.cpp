@@ -129,7 +129,11 @@ int UCTPattern::playout(Board& board, const Color color)
 					if (non_response_weight_board[xy] == 0)
 					{
 						NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, xy, color);
-						non_response_weight_board[xy] = rpw.nonresponse_pattern_weight[nonresponse_val];
+						auto itr = rpw.nonresponse_pattern_weight.find(nonresponse_val);
+						if (itr != rpw.nonresponse_pattern_weight.end())
+						{
+							non_response_weight_board[xy] = itr->second;
+						}
 					}
 					weight_sum = non_response_weight_board[xy];
 
@@ -138,17 +142,22 @@ int UCTPattern::playout(Board& board, const Color color)
 					if (response_val != 0)
 					{
 						//weight_sum += response_match_weight;
-						weight_sum += rpw.response_pattern_weight[response_val];
+						auto itr = rpw.response_pattern_weight.find(response_val);
+						if (itr != rpw.response_pattern_weight.end())
+						{
+							weight_sum += itr->second;
+						}
+
+						// 直前の手に隣接する手か
+						if (is_neighbour(board, xy))
+						{
+							weight_sum += rpw.neighbour_weight;
+						}
 					}
 					// アタリを助ける手か
 					if (atari_save.bit_test(xy))
 					{
 						weight_sum += rpw.save_atari_weight;
-					}
-					// 直前の手に隣接する手か
-					if (is_neighbour(board, xy))
-					{
-						weight_sum += rpw.neighbour_weight;
 					}
 
 					// 各手のsoftmaxを計算
