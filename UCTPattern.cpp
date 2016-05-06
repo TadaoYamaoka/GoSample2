@@ -71,56 +71,41 @@ int UCTPattern::playout(Board& board, const Color color)
 		// アタリを助ける手
 		board.get_atari_save(color, atari_save);
 
-		// 直前に変更のあった連の周辺の更新が必要な位置
-		XY update_x_min[BOARD_SIZE_MAX + 1];
-		XY update_x_max[BOARD_SIZE_MAX + 1] = { 0 };
-		if (loop == 0)
+		// 直前に変更のあった連の周辺の評価値を初期化する
+		for (int i = 0; i < board.pre_changed_group_num; i++)
 		{
-			// 初回は全て更新
-			for (XY update_y = 1; update_y <= BOARD_SIZE; update_y++)
+			Group& changed_group = board.groups[board.pre_changed_group[i]];
+			for (int j = 0; j < changed_group.stone_num; j++)
 			{
-				update_x_min[update_y] = 0;
-				update_x_max[update_y] = BOARD_SIZE;
-			}
-		}
-		else 
-		{
-			for (int i = 0; i < board.pre_changed_group_num; i++)
-			{
-				Group& changed_group = board.groups[board.pre_changed_group[i]];
-				for (int j = 0; j < changed_group.stone_num; j++)
-				{
-					XY x = get_x(changed_group.stone[j]);
-					XY y = get_y(changed_group.stone[j]);
+				XY xy = changed_group.stone[j];
 
-					// 2pointsの範囲が更新対象
-					XY x_min = x - 2;
-					XY x_max = x + 2;
-					XY y_min = y - 2;
-					if (y_min < 1)
+				XY x = get_x(xy);
+				XY y = get_y(xy);
+				XY x_min = x - 2;
+				if (x_min < 1)
+				{
+					x_min = 1;
+				}
+				XY x_max = x + 2;
+				if (x_max > BOARD_SIZE)
+				{
+					x_max = BOARD_SIZE;
+				}
+				XY y_min = y - 2;
+				if (y_min < 1)
+				{
+					y_min = 1;
+				}
+				XY y_max = y + 2;
+				if (y_max > BOARD_SIZE)
+				{
+					y_max = BOARD_SIZE;
+				}
+				for (XY y = y_min; y <= y_max; y++)
+				{
+					for (XY x = x_min; x <= x_min; x++)
 					{
-						y_min = 1;
-					}
-					XY y_max = y + 2;
-					if (y_max > BOARD_SIZE)
-					{
-						y_max = BOARD_SIZE;
-					}
-					for (XY update_y = y_min; update_y <= y_max; update_y++)
-					{
-						if (update_x_max[update_y] == 0)
-						{
-							update_x_min[update_y] = x_min;
-							update_x_max[update_y] = x_max;
-						}
-						else if (x_min < update_x_min[update_y])
-						{
-							update_x_min[update_y] = x_min;
-						}
-						else if (x_max > update_x_max[update_y])
-						{
-							update_x_max[update_y] = x_max;
-						}
+						non_response_weight_board[get_xy(x, y)] = 0;
 					}
 				}
 			}
@@ -128,12 +113,11 @@ int UCTPattern::playout(Board& board, const Color color)
 
 		// 候補手一覧(合法手チェックなし)
 		int possibles_num = 0;
-		for (XY y = 1; y <= BOARD_SIZE; y++)
+		for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
 		{
-			XY yy = y * BOARD_WIDTH;
 			for (XY x = 1; x <= BOARD_SIZE; x++)
 			{
-				XY xy = yy + x;
+				XY xy = y + x;
 				if (board.is_empty(xy))
 				{
 					float weight_sum;
@@ -142,7 +126,7 @@ int UCTPattern::playout(Board& board, const Color color)
 					// 重みの線形和
 					// Non-response pattern
 					// 初回もしくは直前に変更のあった連の周辺のみ更新する
-					if (x <= update_x_max[y] && x >= update_x_min[y])
+					if (non_response_weight_board[xy] == 0)
 					{
 						NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, xy, color);
 						non_response_weight_board[xy] = rpw.nonresponse_pattern_weight[nonresponse_val];
