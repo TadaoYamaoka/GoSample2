@@ -1,7 +1,6 @@
 #include <windows.h>
 #include <string>
 #include <cassert>
-#include <map>
 #include <vector>
 
 #include "../Board.h"
@@ -22,20 +21,7 @@ const int HASH_KEY_BIT = 24;
 const int HASH_KEY_MAX = 1 << HASH_KEY_BIT;
 const int HASH_KEY_MASK = HASH_KEY_MAX - 1;
 
-// アタリを防ぐ手の重み
-float save_atari_weight;
-
-// 直前の手と隣接
-float neighbour_weight;
-
-// レスポンスマッチの重み
-float response_match_weight;
-
-// レスポンスパターンの重み
-map<ResponsePatternVal, float> response_pattern_weight;
-
-// ノンレスポンスパターンの重み
-map<NonResponsePatternVal, float> nonresponse_pattern_weight;
+RolloutPolicyWeight rpw;
 
 // ハッシュキー衝突検出用
 ResponsePatternVal response_pattern_collision[HASH_KEY_MAX];
@@ -254,21 +240,21 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num)
 
 					// パラメータ更新準備
 					// 重みの線形和
-					float weight_sum = nonresponse_pattern_weight[nonresponse_val];
+					float weight_sum = rpw.nonresponse_pattern_weight[nonresponse_val];
 					if (response_val != 0)
 					{
-						weight_sum += response_match_weight;
-						weight_sum += response_pattern_weight[response_val];
+						weight_sum += rpw.response_match_weight;
+						weight_sum += rpw.response_pattern_weight[response_val];
 					}
 					// アタリを助ける手か
 					if (atari_save.bit_test(txy))
 					{
-						weight_sum += save_atari_weight;
+						weight_sum += rpw.save_atari_weight;
 					}
 					// 直前の手に隣接する手か
 					if (is_neighbour(board, txy))
 					{
-						weight_sum += neighbour_weight;
+						weight_sum += rpw.neighbour_weight;
 					}
 
 					// 各手のsoftmaxを計算
@@ -302,22 +288,22 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num)
 			}
 			else
 			{
-				nonresponse_pattern_weight[key_y.nonresponse_val] -= eta * (y - 1.0f) * nonresponse_pattern_weight[key_y.nonresponse_val];
+				rpw.nonresponse_pattern_weight[key_y.nonresponse_val] -= eta * (y - 1.0f) * rpw.nonresponse_pattern_weight[key_y.nonresponse_val];
 			}
 			if (key_y.response_val != 0)
 			{
-				response_match_weight -= eta * (y - 1.0f) * response_match_weight;
-				response_pattern_weight[key_y.response_val] -= eta * (y - 1.0f) * response_pattern_weight[key_y.response_val];
+				rpw.response_match_weight -= eta * (y - 1.0f) * rpw.response_match_weight;
+				rpw.response_pattern_weight[key_y.response_val] -= eta * (y - 1.0f) * rpw.response_pattern_weight[key_y.response_val];
 			}
 			// アタリを助ける手か
 			if (atari_save.bit_test(xy))
 			{
-				save_atari_weight -= eta * (y - 1.0f) * save_atari_weight;
+				rpw.save_atari_weight -= eta * (y - 1.0f) * rpw.save_atari_weight;
 			}
 			// 直前の手に隣接する手か
 			if (is_neighbour(board, xy))
 			{
-				neighbour_weight -= eta * (y - 1.0f) * neighbour_weight;
+				rpw.neighbour_weight -= eta * (y - 1.0f) * rpw.neighbour_weight;
 			}
 
 			// 損失関数
@@ -334,22 +320,22 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num)
 				}
 				else
 				{
-					nonresponse_pattern_weight[keys[i].nonresponse_val] -= eta * y_etc * nonresponse_pattern_weight[keys[i].nonresponse_val];
+					rpw.nonresponse_pattern_weight[keys[i].nonresponse_val] -= eta * y_etc * rpw.nonresponse_pattern_weight[keys[i].nonresponse_val];
 				}
 				if (keys[i].response_val != 0)
 				{
-					response_match_weight -= eta * y_etc * response_match_weight;
-					response_pattern_weight[keys[i].response_val] -= eta * y_etc * response_pattern_weight[keys[i].response_val];
+					rpw.response_match_weight -= eta * y_etc * rpw.response_match_weight;
+					rpw.response_pattern_weight[keys[i].response_val] -= eta * y_etc * rpw.response_pattern_weight[keys[i].response_val];
 				}
 				// アタリを助ける手か
 				if (atari_save.bit_test(keys[i].xy))
 				{
-					save_atari_weight -= eta * y_etc * save_atari_weight;
+					rpw.save_atari_weight -= eta * y_etc * rpw.save_atari_weight;
 				}
 				// 直前の手に隣接する手か
 				if (is_neighbour(board, keys[i].xy))
 				{
-					neighbour_weight -= eta * y_etc * neighbour_weight;
+					rpw.neighbour_weight -= eta * y_etc * rpw.neighbour_weight;
 				}
 			}
 
@@ -381,7 +367,7 @@ void read_pattern()
 		ResponsePatternVal response;
 		fread(&response, sizeof(response), 1, fp);
 
-		response_pattern_weight.insert({ response, 1.0f });
+		rpw.response_pattern_weight.insert({ response, 1.0f });
 	}
 	fclose(fp);
 
@@ -396,7 +382,7 @@ void read_pattern()
 		NonResponsePatternVal nonresponse;
 		fread(&nonresponse, sizeof(nonresponse), 1, fp);
 
-		nonresponse_pattern_weight.insert({ nonresponse, 1.0f });
+		rpw.nonresponse_pattern_weight.insert({ nonresponse, 1.0f });
 	}
 	fclose(fp);
 }
@@ -407,9 +393,9 @@ void learn_pattern(const wchar_t* dirs)
 	int learned_position_num = 0; // 学習局面数
 
 	// 重み初期化
-	save_atari_weight = 1.0f;
-	neighbour_weight = 1.0f;
-	response_match_weight = 1.0f;
+	rpw.save_atari_weight = 1.0f;
+	rpw.neighbour_weight = 1.0f;
+	rpw.response_match_weight = 1.0f;
 
 	// パターン読み込む
 	read_pattern();
@@ -452,20 +438,20 @@ void learn_pattern(const wchar_t* dirs)
 		}
 	}
 
-	printf("response pattern weight num = %d\n", response_pattern_weight.size());
-	printf("nonresponse pattern weight num = %d\n", nonresponse_pattern_weight.size());
+	printf("response pattern weight num = %d\n", rpw.response_pattern_weight.size());
+	printf("nonresponse pattern weight num = %d\n", rpw.nonresponse_pattern_weight.size());
 
 	// 重み順にソート
 	multimap<float, ResponsePatternVal> response_weight_sorted;
 	multimap<float, NonResponsePatternVal> nonresponse_weight_sorted;
-	for (auto itr : response_pattern_weight)
+	for (auto itr : rpw.response_pattern_weight)
 	{
 		if (itr.second > 0.01f)
 		{
 			response_weight_sorted.insert({ itr.second, itr.first });
 		}
 	}
-	for (auto itr : nonresponse_pattern_weight)
+	for (auto itr : rpw.nonresponse_pattern_weight)
 	{
 		if (itr.second > 0.01f)
 		{
@@ -476,9 +462,9 @@ void learn_pattern(const wchar_t* dirs)
 	printf("response pattern weight output num = %d\n", response_weight_sorted.size());
 	printf("nonresponse pattern weight output num = %d\n", nonresponse_weight_sorted.size());
 
-	printf("save atari weight = %f\n", save_atari_weight);
-	printf("neighbour_weight = %f\n", neighbour_weight);
-	printf("response match weight = %f\n", response_match_weight);
+	printf("save atari weight = %f\n", rpw.save_atari_weight);
+	printf("neighbour_weight = %f\n", rpw.neighbour_weight);
+	printf("response match weight = %f\n", rpw.response_match_weight);
 	// Top10
 	int n = 0;
 	for (auto itr = response_weight_sorted.rbegin(); itr != response_weight_sorted.rend() && n < 10; itr++, n++)
@@ -493,9 +479,9 @@ void learn_pattern(const wchar_t* dirs)
 
 	// 重み出力
 	FILE* fp_weight = fopen("rollout.bin", "wb");
-	fwrite(&save_atari_weight, sizeof(save_atari_weight), 1, fp_weight);
-	fwrite(&neighbour_weight, sizeof(neighbour_weight), 1, fp_weight);
-	fwrite(&response_match_weight, sizeof(response_match_weight), 1, fp_weight);
+	fwrite(&rpw.save_atari_weight, sizeof(rpw.save_atari_weight), 1, fp_weight);
+	fwrite(&rpw.neighbour_weight, sizeof(rpw.neighbour_weight), 1, fp_weight);
+	fwrite(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
 	int num = response_weight_sorted.size();
 	fwrite(&num, sizeof(num), 1, fp_weight);
 	for (auto itr = response_weight_sorted.rbegin(); itr != response_weight_sorted.rend(); itr++)
@@ -767,9 +753,9 @@ void dump_weight()
 
 	// 重み読み込み
 	FILE* fp_weight = fopen("rollout.bin", "rb");
-	fread(&save_atari_weight, sizeof(save_atari_weight), 1, fp_weight);
-	fread(&neighbour_weight, sizeof(neighbour_weight), 1, fp_weight);
-	fread(&response_match_weight, sizeof(response_match_weight), 1, fp_weight);
+	fread(&rpw.save_atari_weight, sizeof(rpw.save_atari_weight), 1, fp_weight);
+	fread(&rpw.neighbour_weight, sizeof(rpw.neighbour_weight), 1, fp_weight);
+	fread(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
 	int num;
 	fread(&num, sizeof(num), 1, fp_weight);
 	for (int i = 0; i < num; i++)
@@ -795,9 +781,9 @@ void dump_weight()
 	printf("response pattern weight output num = %d\n", response_weight_sorted.size());
 	printf("nonresponse pattern weight output num = %d\n", nonresponse_weight_sorted.size());
 
-	printf("save atari weight = %f\n", save_atari_weight);
-	printf("neighbour_weight = %f\n", neighbour_weight);
-	printf("response match weight = %f\n", response_match_weight);
+	printf("save atari weight = %f\n", rpw.save_atari_weight);
+	printf("neighbour_weight = %f\n", rpw.neighbour_weight);
+	printf("response match weight = %f\n", rpw.response_match_weight);
 
 	// Top10
 	printf("Top10\n");

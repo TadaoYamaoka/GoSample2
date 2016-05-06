@@ -14,28 +14,16 @@ extern UCTNode* create_child_node(const int size);
 
 extern void check_atari_save(const Board& board, const Color color, UCTNode* node);
 
-// アタリを防ぐ手の重み
-float save_atari_weight;
-
-// 直前の手と隣接
-float neighbour_weight;
-
-// レスポンスマッチの重み
-float response_match_weight;
-
-// レスポンスパターンの重み
-map<ResponsePatternVal, float> response_pattern_weight;
-
-// ノンレスポンスパターンの重み
-map<NonResponsePatternVal, float> nonresponse_pattern_weight;
+// rollout policyの重み
+RolloutPolicyWeight rpw;
 
 void load_weight(const char* filepath)
 {
 	// 重み読み込み
 	FILE* fp_weight = fopen(filepath, "rb");
-	fread(&save_atari_weight, sizeof(save_atari_weight), 1, fp_weight);
-	fread(&neighbour_weight, sizeof(neighbour_weight), 1, fp_weight);
-	fread(&response_match_weight, sizeof(response_match_weight), 1, fp_weight);
+	fread(&rpw.save_atari_weight, sizeof(rpw.save_atari_weight), 1, fp_weight);
+	fread(&rpw.neighbour_weight, sizeof(rpw.neighbour_weight), 1, fp_weight);
+	fread(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
 	int num;
 	fread(&num, sizeof(num), 1, fp_weight);
 	for (int i = 0; i < num; i++)
@@ -44,7 +32,7 @@ void load_weight(const char* filepath)
 		float weight;
 		fread(&val, sizeof(val), 1, fp_weight);
 		fread(&weight, sizeof(weight), 1, fp_weight);
-		response_pattern_weight.insert({ val, weight });
+		rpw.response_pattern_weight.insert({ val, weight });
 	}
 	fread(&num, sizeof(num), 1, fp_weight);
 	for (int i = 0; i < num; i++)
@@ -53,7 +41,7 @@ void load_weight(const char* filepath)
 		float weight;
 		fread(&val, sizeof(val), 1, fp_weight);
 		fread(&weight, sizeof(weight), 1, fp_weight);
-		nonresponse_pattern_weight.insert({ val, weight });
+		rpw.nonresponse_pattern_weight.insert({ val, weight });
 	}
 	fclose(fp_weight);
 }
@@ -83,20 +71,45 @@ int UCTPattern::playout(Board& board, const Color color)
 		// アタリを助ける手
 		board.get_atari_save(color, atari_save);
 
-		// 直前に変更のあった連の周辺の評価値を初期化する
+		// 直前に変更のあった連の周辺の更新が必要な位置
+		XY update_x_min[BOARD_SIZE_MAX];
+		XY update_x_max[BOARD_BYTE_MAX] = { 0 };
 		for (int i = 0; i < board.pre_changed_group_num; i++)
 		{
 			Group& changed_group = board.groups[board.pre_changed_group[i]];
 			for (int j = 0; j < changed_group.stone_num; j++)
 			{
-				XY xy = changed_group.stone[j];
-				non_response_weight_board[xy] = 0;
+				XY x = get_x(changed_group.stone[j]);
+				XY y = get_y(changed_group.stone[j]);
 
-				const XY DIR8[] = { -BOARD_WIDTH - 1, -BOARD_WIDTH, -BOARD_WIDTH + 1, -1, 1, BOARD_WIDTH - 1, BOARD_WIDTH, BOARD_WIDTH + 1 };
-				for (XY d : DIR8)
+				// 2pointsの範囲が更新対象
+				XY x_min = x - 2;
+				XY x_max = x + 2;
+				XY y_min = y - 2;
+				if (y_min < 1)
 				{
-					XY xyd = xy + d;
-					non_response_weight_board[xyd] = 0;
+					y_min = 1;
+				}
+				XY y_max = y + 2;
+				if (y_max > BOARD_SIZE)
+				{
+					y = BOARD_SIZE;
+				}
+				for (XY update_y = y_min; update_y < y_max; update_y++)
+				{
+					if (update_x_max[update_y] == 0)
+					{
+						update_x_min[update_y] = x_min;
+						update_x_max[update_y] = x_max;
+					}
+					else if (x_min < update_x_min[update_y])
+					{
+						update_x_min[update_y] = x_min;
+					}
+					else if (x_max > update_x_max[update_y])
+					{
+						update_x_max[update_y] = x_max;
+					}
 				}
 			}
 		}
@@ -116,10 +129,10 @@ int UCTPattern::playout(Board& board, const Color color)
 					// 重みの線形和
 					// Non-response pattern
 					// 初回もしくは直前に変更のあった連の周辺のみ更新する
-					if (non_response_weight_board[xy] == 0)
+					if (loop == 0 || (x <= update_x_max[y] && x >= update_x_min[y]))
 					{
 						NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, xy, color);
-						non_response_weight_board[xy] = nonresponse_pattern_weight[nonresponse_val];
+						non_response_weight_board[xy] = rpw.nonresponse_pattern_weight[nonresponse_val];
 					}
 					weight_sum = non_response_weight_board[xy];
 
@@ -128,17 +141,17 @@ int UCTPattern::playout(Board& board, const Color color)
 					if (response_val != 0)
 					{
 						//weight_sum += response_match_weight;
-						weight_sum += response_pattern_weight[response_val];
+						weight_sum += rpw.response_pattern_weight[response_val];
 					}
 					// アタリを助ける手か
 					if (atari_save.bit_test(xy))
 					{
-						weight_sum += save_atari_weight;
+						weight_sum += rpw.save_atari_weight;
 					}
 					// 直前の手に隣接する手か
 					if (is_neighbour(board, xy))
 					{
-						weight_sum += neighbour_weight;
+						weight_sum += rpw.neighbour_weight;
 					}
 
 					// 各手のsoftmaxを計算
