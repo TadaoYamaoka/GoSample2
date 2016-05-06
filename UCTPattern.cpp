@@ -75,20 +75,19 @@ int UCTPattern::playout(Board& board, const Color color)
 	for (int loop = 0; loop < BOARD_MAX + 200; loop++)
 	{
 		int selected_xy;
-		int selected_i = -1;
 		int e_weight_sum = 0;
 
 		// アタリを助ける手
 		board.get_atari_save(color, atari_save);
 
-		// 候補手一覧(合法手のみ)
+		// 候補手一覧(合法手チェックなし)
 		int possibles_num = 0;
 		for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
 		{
 			for (XY x = 1; x <= BOARD_SIZE; x++)
 			{
 				XY xy = y + x;
-				if (board.is_empty(xy) && board.is_legal(xy, color_tmp) == SUCCESS)
+				if (board.is_empty(xy))
 				{
 					// 確率算出
 					ResponsePatternVal response_val = response_pattern(board, xy, color);
@@ -124,30 +123,44 @@ int UCTPattern::playout(Board& board, const Color color)
 			}
 		}
 
-		if (possibles_num == 0)
+		while (true)
 		{
-			// 合法手がない場合、パス
-			selected_xy = PASS;
-		}
-		else
-		{
-			// 確率に応じて手を選択
-			selected_xy = possibles[possibles_num - 1].xy;
-			int e_weight_tmp = 0;
-			int r = random.random() % e_weight_sum;
-			for (int i = 0; i < possibles_num - 1; i++)
+			int selected_i;
+			if (possibles_num == 0)
 			{
-				e_weight_tmp += possibles[i].e_weight;
-				if (r < e_weight_tmp)
+				// 合法手がない場合、パス
+				selected_xy = PASS;
+			}
+			else {
+				// 確率に応じて手を選択
+				selected_i = possibles_num - 1;
+				selected_xy = possibles[selected_i].xy;
+				int e_weight_tmp = 0;
+				int r = random.random() % e_weight_sum;
+				for (int i = 0; i < possibles_num - 1; i++)
 				{
-					selected_xy = possibles[i].xy;
-					break;
+					e_weight_tmp += possibles[i].e_weight;
+					if (r < e_weight_tmp)
+					{
+						selected_i = i;
+						selected_xy = possibles[i].xy;
+						break;
+					}
 				}
 			}
-		}
 
-		// 石を打つ(合法手)
-		board.move_legal(selected_xy, color_tmp);
+			// 石を打つ
+			MoveResult err = board.move(selected_xy, color_tmp);
+
+			if (err == SUCCESS)
+			{
+				break;
+			}
+
+			// 手を削除
+			possibles[selected_i] = possibles[possibles_num - 1];
+			possibles_num--;
+		}
 
 		// 連続パスで終了
 		if (selected_xy == PASS && pre_xy == PASS)

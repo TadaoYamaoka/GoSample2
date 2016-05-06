@@ -362,10 +362,10 @@ int main()
 {
 	load_weight("../learn/rollout.bin");
 
-	//test_001();
-	//test_002();
+	test_001();
+	test_002();
 	test_003();
-	//test_004();
+	test_004();
 	//test_ladder_search_001();
 	//test_ladder_search_002();
 	//test_ladder_search_003();
