@@ -503,7 +503,7 @@ void learn_pattern(const wchar_t* dirs)
 	fclose(fp_weight);
 }
 
-int prepare_pattern_sgf(const wchar_t* infile, map<ResponsePatternVal, int>& response_pattern_map, map<NonResponsePatternVal, int>& nonresponse_pattern_map)
+int prepare_pattern_sgf(const wchar_t* infile, map<ResponsePatternVal, int>& response_pattern_map, map<NonResponsePatternVal, int>& nonresponse_pattern_map, map<Diamond12PatternVal, int>& diamond12_pattern_map)
 {
 	FILE* fp = _wfopen(infile, L"r");
 	char buf[10000];
@@ -584,6 +584,7 @@ void prepare_pattern(const wchar_t* dirs)
 
 	map<ResponsePatternVal, int> response_pattern_map;
 	map<NonResponsePatternVal, int> nonresponse_pattern_map;
+	map<Diamond12PatternVal, int> diamond12_pattern_map;
 
 	FILE *fp_dirlist = _wfopen(dirs, L"r");
 	wchar_t dir[1024];
@@ -607,8 +608,8 @@ void prepare_pattern(const wchar_t* dirs)
 				continue;
 			}
 
-			// パターン学習
-			learned_game_num += prepare_pattern_sgf((finddir + L"\\" + win32fd.cFileName).c_str(), response_pattern_map, nonresponse_pattern_map);
+			// パターン抽出
+			learned_game_num += prepare_pattern_sgf((finddir + L"\\" + win32fd.cFileName).c_str(), response_pattern_map, nonresponse_pattern_map, diamond12_pattern_map);
 		} while (FindNextFile(hFind, &win32fd));
 	}
 	fclose(fp_dirlist);

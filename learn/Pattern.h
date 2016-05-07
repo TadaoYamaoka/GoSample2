@@ -381,8 +381,8 @@ struct NonResponsePatternVal
 	}
 };
 
-extern ResponsePatternVal response_pattern(const Board& board, const XY xy, Color color);
-extern NonResponsePatternVal nonresponse_pattern(const Board& board, const XY xy, Color color);
+extern ResponsePatternVal response_pattern(const Board& board, const XY xy, const Color color);
+extern NonResponsePatternVal nonresponse_pattern(const Board& board, const XY xy, const Color color);
 
 inline bool is_neighbour(const Board& board, XY xy)
 {
