@@ -76,14 +76,84 @@ HashKey get_hash_key_nonresponse_pattern(const NonResponsePatternVal& val)
 		^ hash_key_pattern[3][val.vals.color_liberties[3]];
 }
 
-bool is_sido(char* next)
+// 文字列検索(UTF-8)
+const char* strsearch(const char* str, const int len, const char* search, const int searchlen)
 {
-	char* ev = strstr(next, "EV[");
-	if (ev == NULL)
+	// BM法で検索
+	for (int pos = searchlen - 1; pos < len; )
+	{
+		bool match = true;
+		int i;
+		int j;
+		for (i = 0, j = 0; i < searchlen && pos + i < len; i++)
+		{
+			if (str[pos - j] == search[searchlen - i - 1])
+			{
+				if (!match)
+				{
+					break;
+				}
+				match = true;
+				j++;
+			}
+			else
+			{
+				match = false;
+			}
+		}
+
+		if (match)
+		{
+			return str + pos - searchlen + 1;
+		}
+		else
+		{
+			pos += i;
+		}
+	}
+	return nullptr;
+}
+
+// 文字検索(UTF-8)
+const char* strsearch_char(const char* str, const int len, const char c)
+{
+	for (int i = 0; i < len; i++)
+	{
+		if (str[i] == c)
+		{
+			return str + i;
+		}
+	}
+	return nullptr;
+}
+
+bool is_exclude(char* next)
+{
+	const char* ev = strsearch(next, 200, "EV[", 3);
+
+
+	if (ev == nullptr)
 	{
 		return false;
 	}
-	if (ev[9] == -26 && ev[10] == -116 && ev[11] == -121)
+
+	const char* ev_end = strsearch_char(ev, 200, ']');
+	if (ev_end == nullptr)
+	{
+		return false;
+	}
+	const int ev_len = ev_end - ev;
+
+	// 指導(UTF-8)
+	const char sido[] = { 0xe6, 0x8c, 0x87, 0xe5, 0xb0, 0x8e };
+	// アマ(UTF-8)
+	const char ama[] = { 0xe3, 0x82, 0xa2, 0xe3, 0x83, 0x9e };
+
+	if (strsearch(ev, ev_len, sido, sizeof(sido)))
+	{
+		return true;
+	}
+	else if (strsearch(ev, ev_len, ama, sizeof(ama)))
 	{
 		return true;
 	}
@@ -177,8 +247,9 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num)
 	char* next = strtok(buf, ";");
 
 	// 指導碁除外
-	if (is_sido(next))
+	if (is_exclude(next))
 	{
+		fclose(fp);
 		return 0;
 	}
 
@@ -515,9 +586,10 @@ int prepare_pattern_sgf(const wchar_t* infile, map<ResponsePatternVal, int>& res
 	// ;で区切る
 	char* next = strtok(buf, ";");
 
-	// 指導碁除外
-	if (is_sido(next))
+	// 指導碁、アマ除外
+	if (is_exclude(next))
 	{
+		fclose(fp);
 		return 0;
 	}
 
@@ -564,6 +636,10 @@ int prepare_pattern_sgf(const wchar_t* infile, map<ResponsePatternVal, int>& res
 					// ノンレスポンスパターン
 					NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, txy, color);
 					nonresponse_pattern_map[nonresponse_val]++;
+
+					// 12-point diamondパターン
+					Diamond12PatternVal diamond12_val = diamond12_pattern(board, txy, color);
+					diamond12_pattern_map[diamond12_val]++;
 				}
 			}
 		}
@@ -617,33 +693,51 @@ void prepare_pattern(const wchar_t* dirs)
 	printf("read game num = %d\n", learned_game_num);
 	printf("response pattern num = %d\n", response_pattern_map.size());
 	printf("nonresponse pattern num = %d\n", nonresponse_pattern_map.size());
+	printf("diamond12 pattern num = %d\n", diamond12_pattern_map.size());
 
 	// 頻度順に並べ替え
 	multimap<int, ResponsePatternVal> response_pattern_sorted;
 	multimap<int, NonResponsePatternVal> nonresponse_pattern_sorted;
+	multimap<int, Diamond12PatternVal> diamond12_pattern_sorted;
 
+	int response_pattern_sum = 0;
 	for (auto itr : response_pattern_map)
 	{
 		auto itr2 = response_pattern_sorted.find(itr.second);
 		response_pattern_sorted.insert({ itr.second, itr.first });
+		response_pattern_sum += itr.second;
 	}
+	printf("response pattern sum = %d\n", response_pattern_sum);
 
+	int nonresponse_pattern_sum = 0;
 	for (auto itr : nonresponse_pattern_map)
 	{
 		auto itr2 = nonresponse_pattern_sorted.find(itr.second);
 		nonresponse_pattern_sorted.insert({ itr.second, itr.first });
+		nonresponse_pattern_sum += itr.second;
 	}
+	printf("nonresponse pattern sum = %d\n", nonresponse_pattern_sum);
+
+	int diamond12_pattern_sum = 0;
+	for (auto itr : diamond12_pattern_map)
+	{
+		auto itr2 = diamond12_pattern_sorted.find(itr.second);
+		diamond12_pattern_sorted.insert({ itr.second, itr.first });
+		diamond12_pattern_sum += itr.second;
+	}
+	printf("diamond12 pattern sum = %d\n", diamond12_pattern_sum);
 
 	// 頻度順に出力
 	int response_pattern_outnum = 0;
 	FILE* fp = fopen("response.ptn", "wb");
 	for (auto itr = response_pattern_sorted.rbegin(); itr != response_pattern_sorted.rend(); itr++)
 	{
-		if (itr->first >= 10)
+		if (itr->first < 50)
 		{
-			fwrite(&itr->second, sizeof(itr->second), 1, fp);
-			response_pattern_outnum++;
+			break;
 		}
+		fwrite(&itr->second, sizeof(itr->second), 1, fp);
+		response_pattern_outnum++;
 	}
 	fclose(fp);
 
@@ -651,16 +745,30 @@ void prepare_pattern(const wchar_t* dirs)
 	fp = fopen("nonresponse.ptn", "wb");
 	for (auto itr = nonresponse_pattern_sorted.rbegin(); itr != nonresponse_pattern_sorted.rend(); itr++)
 	{
-		if (itr->first >= 10)
+		if (itr->first < 10)
 		{
-			fwrite(&itr->second, sizeof(itr->second), 1, fp);
-			nonresponse_pattern_outnum++;
+			break;
 		}
+		fwrite(&itr->second, sizeof(itr->second), 1, fp);
+		nonresponse_pattern_outnum++;
+	}
+
+	int diamond12_pattern_outnum = 0;
+	fp = fopen("diamond12.ptn", "wb");
+	for (auto itr = diamond12_pattern_sorted.rbegin(); itr != diamond12_pattern_sorted.rend(); itr++)
+	{
+		if (itr->first < 500)
+		{
+			break;
+		}
+		fwrite(&itr->second, sizeof(itr->second), 1, fp);
+		diamond12_pattern_outnum++;
 	}
 	fclose(fp);
 
 	printf("response pattern output num = %d\n", response_pattern_outnum);
 	printf("nonresponse pattern output num = %d\n", nonresponse_pattern_outnum);
+	printf("diamond12 pattern output num = %d\n", diamond12_pattern_outnum);
 
 	// Top10表示
 	int num = 0;
@@ -678,6 +786,17 @@ void prepare_pattern(const wchar_t* dirs)
 	for (auto itr = nonresponse_pattern_sorted.rbegin(); itr != nonresponse_pattern_sorted.rend(); itr++)
 	{
 		printf("nonresponse : %x, %d\n", itr->second.val32, itr->first);
+		num++;
+
+		if (num >= 10)
+		{
+			break;
+		}
+	}
+	num = 0;
+	for (auto itr = diamond12_pattern_sorted.rbegin(); itr != diamond12_pattern_sorted.rend(); itr++)
+	{
+		printf("diamond12 : %x, %d\n", itr->second.val64, itr->first);
 		num++;
 
 		if (num >= 10)
