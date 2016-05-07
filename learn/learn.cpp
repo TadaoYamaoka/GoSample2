@@ -21,7 +21,11 @@ const int HASH_KEY_BIT = 24;
 const int HASH_KEY_MAX = 1 << HASH_KEY_BIT;
 const int HASH_KEY_MASK = HASH_KEY_MAX - 1;
 
+// rollout policyの重み
 RolloutPolicyWeight rpw;
+
+// tree policyの重み
+TreePolicyWeight tpw;
 
 // ハッシュキー衝突検出用
 ResponsePatternVal response_pattern_collision[HASH_KEY_MAX];

@@ -258,6 +258,6 @@ public:
 	static bool Board::ladder_search(const Board& board, const Color color, const XY xy, Color tmp_board[BOARD_BYTE_MAX], XY liberties[2], const int depth);
 
 	// アタリを助ける手か（シチョウ判定有）
-	bool Board::is_atari_save_with_ladder_search(const Color color, const XY xy) const;
+	bool is_atari_save_with_ladder_search(const Color color, const XY xy) const;
 };
 
