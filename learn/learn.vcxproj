@@ -21,9 +21,11 @@
   <ItemGroup>
     <ClCompile Include="..\Board.cpp" />
     <ClCompile Include="learn.cpp" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="Pattern.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="learn.h" />
     <ClInclude Include="Pattern.h" />
     <ClInclude Include="Sgf.h" />
   </ItemGroup>

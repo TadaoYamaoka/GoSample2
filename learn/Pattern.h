@@ -1,5 +1,6 @@
 #pragma once
 #include <map>
+#include "../Board.h"
 
 typedef unsigned char PatternVal8;
 typedef unsigned int PatternVal32;

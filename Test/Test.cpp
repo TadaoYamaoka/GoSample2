@@ -4,6 +4,7 @@
 #include "../Debug.h"
 #include "../Board.h"
 #include "../learn/Sgf.h"
+#include "../learn/learn.h"
 #include "../UCTSample.h"
 #include "../UCTParallel.h"
 #include "../UCTSaveAtari.h"
@@ -547,6 +548,78 @@ void test_is_self_atari_005()
 	assert(res, true);
 }
 
+void test_pattern_001()
+{
+	Color test_board[] = {
+	//  1  2  3  4  5  6  7  8  9
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 1
+		0, 1, 1, 1, 1, 0, 0, 0, 0, // 2
+		1, 1, 0, 1, 2, 0, 0, 0, 0, // 3
+		0, 1, 1, 1, 1, 0, 0, 0, 0, // 4
+		0, 0, 2, 0, 0, 0, 0, 0, 0, // 5
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 6
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 7
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 8
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 9
+	};
+	Board board(9);
+	init_board(board, test_board, 9);
+
+	board.move(get_xy(3, 3), BLACK, false);
+
+	debug_print_board(board);
+
+	ResponsePatternVal val = response_pattern(board, get_xy(3, 1), WHITE);
+
+	print_response_pattern(val);
+}
+
+void test_pattern_002()
+{
+	Color test_board[] = {
+	//  1  2  3  4  5  6  7  8  9
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 1
+		0, 1, 1, 2, 1, 0, 0, 0, 0, // 2
+		1, 1, 0, 1, 2, 0, 0, 0, 0, // 3
+		0, 1, 2, 1, 1, 0, 0, 0, 0, // 4
+		0, 0, 2, 0, 0, 0, 0, 0, 0, // 5
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 6
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 7
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 8
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 9
+	};
+	Board board(9);
+	init_board(board, test_board, 9);
+	debug_print_board(board);
+
+	NonResponsePatternVal val = nonresponse_pattern(board, get_xy(3, 3), WHITE);
+
+	print_nonresponse_pattern(val);
+}
+
+void test_pattern_003()
+{
+	Color test_board[] = {
+	//  1  2  3  4  5  6  7  8  9
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 1
+		0, 1, 1, 1, 1, 0, 0, 0, 0, // 2
+		1, 1, 0, 1, 2, 0, 0, 0, 0, // 3
+		0, 1, 1, 1, 1, 0, 0, 0, 0, // 4
+		0, 0, 2, 0, 0, 0, 0, 0, 0, // 5
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 6
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 7
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 8
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 9
+	};
+	Board board(9);
+	init_board(board, test_board, 9);
+	debug_print_board(board);
+
+	Diamond12PatternVal val = diamond12_pattern(board, get_xy(3, 3), WHITE);
+
+	print_diamond12_pattern(val);
+}
+
 int main()
 {
 	//load_weight("../learn/rollout.bin");
@@ -563,10 +636,13 @@ int main()
 	//test_ladder_search_005();
 	//test_ladder_search_006();
 	//test_ladder_search_007();
-	test_is_self_atari_001();
-	test_is_self_atari_002();
-	test_is_self_atari_003();
-	test_is_self_atari_004();
-	test_is_self_atari_005();
+	//test_is_self_atari_001();
+	//test_is_self_atari_002();
+	//test_is_self_atari_003();
+	//test_is_self_atari_004();
+	//test_is_self_atari_005();
+	test_pattern_001();
+	test_pattern_002();
+	test_pattern_003();
 	return 0;
 }
