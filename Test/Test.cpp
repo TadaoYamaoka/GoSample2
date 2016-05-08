@@ -1,11 +1,15 @@
 #include <stdio.h>
 #include <time.h>
+#include <regex>
 #include "../Debug.h"
 #include "../Board.h"
+#include "../learn/Sgf.h"
 #include "../UCTSample.h"
 #include "../UCTParallel.h"
 #include "../UCTSaveAtari.h"
 #include "../UCTPattern.h";
+
+using namespace std;
 
 UCTSample player;
 
@@ -18,6 +22,43 @@ void init_board(Board& board, Color* test_board, const int boardsize)
 		{
 			board.move(xy, test_board[i], false);
 		}
+	}
+}
+
+// SGFを読み込んでボードを初期化する
+void load_sgf(Board& board, char* sgf_text)
+{
+	// ;で区切る
+	char* next = strtok(sgf_text, ";");
+
+	// 1つ目は読み飛ばす
+	next = strtok(NULL, ";");
+
+	// サイズ取得
+	regex re("SZ\\[\\(d+)\\]");
+	cmatch ma;
+	if (regex_match(next, ma, re))
+	{
+		int size = atoi(ma.str(1).c_str());
+		board.init(size);
+	}
+	else
+	{
+		fprintf(stderr, "sgf error : size\n");
+		return;
+	}
+
+	while ((next = strtok(NULL, ";")) != NULL)
+	{
+		Color color = get_color_from_sgf(next);
+		if (color == 0) {
+			fprintf(stderr, "sgf error : color\n");
+			return;
+		}
+
+		XY xy = get_xy_from_sgf(next);
+
+		board.move(xy, color, false);
 	}
 }
 
@@ -386,15 +427,135 @@ void test_ladder_search_007()
 	assert(xy, get_xy(6, 9));
 }
 
+void test_is_self_atari_001()
+{
+	// アタリになる手
+	Color test_board[] = {
+	//  1  2  3  4  5  6  7  8  9
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 1
+		1, 0, 0, 0, 0, 0, 0, 0, 0, // 2
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 3
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 4
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 5
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 6
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 7
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 8
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 9
+	};
+	Board board(9);
+	init_board(board, test_board, 9);
+	debug_print_board(board);
+
+	bool res = board.is_self_atari(WHITE, get_xy(1, 1));
+
+	assert(res, true);
+}
+
+void test_is_self_atari_002()
+{
+	// アタリにならない手
+	Color test_board[] = {
+	//  1  2  3  4  5  6  7  8  9
+		1, 1, 0, 0, 0, 0, 0, 0, 0, // 1
+		1, 0, 0, 0, 0, 0, 0, 0, 0, // 2
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 3
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 4
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 5
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 6
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 7
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 8
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 9
+	};
+	Board board(9);
+	init_board(board, test_board, 9);
+	debug_print_board(board);
+
+	bool res = board.is_self_atari(WHITE, get_xy(2, 2));
+
+	assert(res, false);
+}
+
+void test_is_self_atari_003()
+{
+	// アタリにならない手(取ることができる)
+	Color test_board[] = {
+	//  1  2  3  4  5  6  7  8  9
+		1, 1, 2, 2, 0, 0, 0, 0, 0, // 1
+		1, 0, 1, 1, 2, 0, 0, 0, 0, // 2
+		1, 0, 2, 2, 0, 0, 0, 0, 0, // 3
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 4
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 5
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 6
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 7
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 8
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 9
+	};
+	Board board(9);
+	init_board(board, test_board, 9);
+	debug_print_board(board);
+
+	bool res = board.is_self_atari(WHITE, get_xy(2, 2));
+
+	assert(res, false);
+}
+
+void test_is_self_atari_004()
+{
+	// アタリにならない手(コウになる)
+	Color test_board[] = {
+		//  1  2  3  4  5  6  7  8  9
+		1, 1, 2, 2, 0, 0, 0, 0, 0, // 1
+		1, 0, 1, 2, 0, 0, 0, 0, 0, // 2
+		1, 1, 2, 2, 0, 0, 0, 0, 0, // 3
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 4
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 5
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 6
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 7
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 8
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 9
+	};
+	Board board(9);
+	init_board(board, test_board, 9);
+	debug_print_board(board);
+
+	bool res = board.is_self_atari(WHITE, get_xy(2, 2));
+
+	assert(res, false);
+}
+
+void test_is_self_atari_005()
+{
+	// アタリになる手(コウにならない)
+	Color test_board[] = {
+		//  1  2  3  4  5  6  7  8  9
+		1, 1, 2, 2, 0, 0, 0, 0, 0, // 1
+		1, 0, 1, 1, 2, 0, 0, 0, 0, // 2
+		1, 1, 2, 2, 0, 0, 0, 0, 0, // 3
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 4
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 5
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 6
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 7
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 8
+		0, 0, 0, 0, 0, 0, 0, 0, 0, // 9
+	};
+	Board board(9);
+	init_board(board, test_board, 9);
+	debug_print_board(board);
+
+	bool res = board.is_self_atari(WHITE, get_xy(2, 2));
+
+	assert(res, true);
+}
+
 int main()
 {
-	load_weight("../learn/rollout.bin");
+	//load_weight("../learn/rollout.bin");
 
-	test_001();
-	test_002();
-	test_003();
-	test_004();
-	test_005();
+	//test_001();
+	//test_002();
+	//test_003();
+	//test_004();
+	//test_005();
 	//test_ladder_search_001();
 	//test_ladder_search_002();
 	//test_ladder_search_003();
@@ -402,5 +563,10 @@ int main()
 	//test_ladder_search_005();
 	//test_ladder_search_006();
 	//test_ladder_search_007();
+	test_is_self_atari_001();
+	test_is_self_atari_002();
+	test_is_self_atari_003();
+	test_is_self_atari_004();
+	test_is_self_atari_005();
 	return 0;
 }

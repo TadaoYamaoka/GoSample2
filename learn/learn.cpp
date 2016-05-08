@@ -6,11 +6,15 @@
 #include "../Board.h"
 #include "../Random.h"
 #include "Pattern.h"
+#include "Sgf.h"
 
 using namespace std;
 
 // 学習係数
 float eta = 0.01;
+
+// 正則化係数
+float ramda = 0.00000001;
 
 // パターン用ハッシュテーブル 12points
 const int HASH_KEY_MAX_PATTERN = 12 / 2; // color,libertiesのセット4byte * 2単位
@@ -30,6 +34,20 @@ TreePolicyWeight tpw;
 // ハッシュキー衝突検出用
 ResponsePatternVal response_pattern_collision[HASH_KEY_MAX];
 NonResponsePatternVal nonresponse_pattern_collision[HASH_KEY_MAX];
+
+template <typename T>
+inline T sgn(const T val)
+{
+	if (val > 0)
+	{
+		return 1;
+	}
+	else if (val < 0)
+	{
+		return -1;
+	}
+	return 0;
+}
 
 // 各色のパターン用ハッシュキー値生成
 void init_hash_table_and_weight(const uint64_t seed) {
@@ -190,48 +208,51 @@ Color get_win_from_re(char* next, const wchar_t* infile)
 	return (win == 'B') ? BLACK : WHITE;
 }
 
-Color get_color_from_sgf(char* next)
+// 教師データに一致する手の更新量
+inline float delta_weight_y(float y, float weight)
 {
-	char c = next[0];
-	Color color;
-	if (c == 'B')
-	{
-		color = BLACK;
-	}
-	else if (c == 'W') {
-		color = WHITE;
-	}
-	else {
-		return 0;
-	}
-	return color;
+	return eta * (y - 1.0f) * weight + sgn(weight) * ramda;
 }
 
-XY get_xy_from_sgf(char* next)
+// 教師データに一致しない手の更新量
+inline float delta_weight_y_etc(float y_etc, float weight)
 {
-	// PASS
-	if (next[2] == ']' || next[2] == '?' || next[1] == ']' || next[2] == 't')
-	{
-		return PASS;
-	}
+	return eta * y_etc * weight + sgn(weight) * ramda;
+}
 
-	int x = next[2] - 'a' + 1;
-	int y = next[3] - 'a' + 1;
-	XY xy = get_xy(x, y);
-	//printf("%s, x, y = %d, %d\n", next, x, y);
-
-	if (next[1] == '\\')
+// 教師データに一致する手の更新
+template <typename T, typename K>
+inline void update_weight_y(T& weightmap, const K& key, float y)
+{
+	auto itr = weightmap.find(key);
+	if (itr == weightmap.end())
 	{
-		x = next[3] - 'a' + 1;
-		y = next[4] - 'a' + 1;
-		xy = get_xy(x, y);
+		return;
 	}
-	else if (next[2] == -28)
-	{
-		xy = get_xy(1, 1);
-	}
+	itr->second -= delta_weight_y(y, itr->second);
+}
 
-	return xy;
+// 教師データに一致しない手の更新
+template <typename T, typename K>
+inline void update_weight_y_etc(T& weightmap, const K& key, float y_etc)
+{
+	auto itr = weightmap.find(key);
+	if (itr == weightmap.end())
+	{
+		return;
+	}
+	itr->second -= delta_weight_y_etc(y_etc, itr->second);
+}
+
+template <typename T, typename K>
+inline float get_weight_val(T& weightmap, const K& key)
+{
+	auto itr = weightmap.find(key);
+	if (itr == weightmap.end())
+	{
+		return 0;
+	}
+	return itr->second;
 }
 
 int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num)
@@ -264,8 +285,10 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num)
 	Board board(19);
 
 	int turn = 0;
-	float loss = 0;
-	int loss_cnt = 0;
+	float rollout_loss = 0;
+	int rollout_loss_cnt = 0;
+	float tree_loss = 0;
+	int tree_loss_cnt = 0;
 	while ((next = strtok(NULL, ";")) != NULL)
 	{
 		Color color = get_color_from_sgf(next);
@@ -282,15 +305,23 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num)
 		// 勝ったプレイヤー
 		if (color == win && turn >= 10)
 		{
-			float e_sum = 0;
-			float e_y = 0;
-			float e_etc[19 * 19] = { 0 };
+			float rollout_e_sum = 0;
+			float rollout_e_y = 0;
+			float rollout_e_etc[19 * 19] = { 0 };
+
+			float tree_e_sum = 0;
+			float tree_e_y = 0;
+			float tree_e_etc[19 * 19] = { 0 };
 
 			struct Key
 			{
 				XY xy;
 				ResponsePatternVal response_val;
 				NonResponsePatternVal nonresponse_val;
+				Diamond12PatternVal diamond12_val;
+				bool is_save_atari;
+				bool is_self_atari;
+				bool is_neighbour;
 			};
 
 			Key key_y; // 教師データのキー
@@ -313,105 +344,251 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num)
 					// ノンレスポンスパターン
 					NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, txy, color);
 
+					// Diamond12パターン
+					Diamond12PatternVal diamond12_val = diamond12_pattern(board, txy, color);
+
+					bool is_save_atari_tmp = false;
+					bool is_self_atari_tmp = false;
+					bool is_neighbour_tmp = false;
+
 					// パラメータ更新準備
+					// rollout policy
 					// 重みの線形和
-					float weight_sum = rpw.nonresponse_pattern_weight[nonresponse_val];
+					float rollout_weight_sum = get_weight_val(rpw.nonresponse_pattern_weight, nonresponse_val);
 					if (response_val != 0)
 					{
-						weight_sum += rpw.response_match_weight;
-						weight_sum += rpw.response_pattern_weight[response_val];
+						rollout_weight_sum += rpw.response_match_weight;
+						rollout_weight_sum += get_weight_val(rpw.response_pattern_weight, response_val);
 					}
 					// アタリを助ける手か
 					if (atari_save.bit_test(txy))
 					{
-						weight_sum += rpw.save_atari_weight;
+						rollout_weight_sum += rpw.save_atari_weight;
 					}
 					// 直前の手に隣接する手か
 					if (is_neighbour(board, txy))
 					{
-						weight_sum += rpw.neighbour_weight;
+						rollout_weight_sum += rpw.neighbour_weight;
 					}
 
 					// 各手のsoftmaxを計算
-					float e = expf(weight_sum);
-					e_sum += e;
+					float rollout_e = expf(rollout_weight_sum);
+					rollout_e_sum += rollout_e;
+
+
+					// tree policy
+					// 重みの線形和
+					float tree_weight_sum = get_weight_val(tpw.nonresponse_pattern_weight, nonresponse_val);
+					if (response_val != 0)
+					{
+						tree_weight_sum += tpw.response_match_weight;
+						tree_weight_sum += get_weight_val(tpw.response_pattern_weight, response_val);
+					}
+					// アタリを助ける手か
+					if (atari_save.bit_test(txy))
+					{
+						tree_weight_sum += tpw.save_atari_weight;
+						is_save_atari_tmp = true;
+					}
+					// 直前の手に隣接する手か
+					if (is_neighbour(board, txy))
+					{
+						tree_weight_sum += tpw.neighbour_weight;
+						is_neighbour_tmp = true;
+					}
+					// アタリになる手か
+					if (board.is_self_atari(color, txy))
+					{
+						is_self_atari_tmp = true;
+					}
+					else
+					{
+						// ならない方を評価
+						tree_weight_sum += tpw.self_atari_weight;
+					}
+					// 直前2手からの距離
+					if (board.pre_xy[0] != PASS)
+					{
+						XY distance = get_distance(txy, board.pre_xy[0]);
+						if (distance < sizeof(tpw.last_move_distance_weight[0]) / sizeof(tpw.last_move_distance_weight[0][0]))
+						{
+							tree_weight_sum += tpw.last_move_distance_weight[0][distance];
+						}
+					}
+					if (board.pre_xy[1] != PASS)
+					{
+						XY distance = get_distance(txy, board.pre_xy[1]);
+						if (distance < sizeof(tpw.last_move_distance_weight[1]) / sizeof(tpw.last_move_distance_weight[1][0]))
+						{
+							tree_weight_sum += tpw.last_move_distance_weight[1][distance];
+						}
+					}
+					// 12-point diamondパターン
+					tree_weight_sum += get_weight_val(tpw.diamond12_pattern_weight, diamond12_val);
+
+					// 各手のsoftmaxを計算
+					float tree_e = expf(tree_weight_sum);
+					tree_e_sum += tree_e;
+
 
 					// 教師データと一致する場合
 					if (txy == xy)
 					{
-						e_y = e;
+						rollout_e_y = rollout_e;
+						tree_e_y = tree_e;
 						key_y.response_val = response_val;
 						key_y.nonresponse_val = nonresponse_val;
+						key_y.diamond12_val = diamond12_val;
+						key_y.is_save_atari = is_save_atari_tmp;
+						key_y.is_self_atari = is_self_atari_tmp;
+						key_y.is_neighbour = is_neighbour_tmp;
 					}
 					else {
-						e_etc[num] = e;
+						rollout_e_etc[num] = rollout_e;
+						tree_e_etc[num] = tree_e;
 						keys[num].xy = txy;
 						keys[num].response_val = response_val;
 						keys[num].nonresponse_val = nonresponse_val;
+						keys[num].diamond12_val = diamond12_val;
+						keys[num].is_save_atari = is_save_atari_tmp;
+						keys[num].is_self_atari = is_self_atari_tmp;
+						keys[num].is_neighbour = is_neighbour_tmp;
 						num++;
 					}
 				}
 			}
 
 			// 教師データと一致する手のsoftmax
-			float y = e_y / e_sum;
+			float rollout_y = rollout_e_y / rollout_e_sum;
+			float tree_y = tree_e_y / tree_e_sum;
 
 			// 教師データと一致する手のパラメータ更新
-			if (key_y.nonresponse_val == 0)
+			if (key_y.nonresponse_val != 0) // 空白パターンは制約条件として更新しない
 			{
-				// 空白パターンは固定値として更新しない
-			}
-			else
-			{
-				rpw.nonresponse_pattern_weight[key_y.nonresponse_val] -= eta * (y - 1.0f) * rpw.nonresponse_pattern_weight[key_y.nonresponse_val];
+				// rollout policy
+				update_weight_y(rpw.nonresponse_pattern_weight, key_y.nonresponse_val, rollout_y);
+				// tree policy
+				update_weight_y(tpw.nonresponse_pattern_weight, key_y.nonresponse_val, tree_y);
 			}
 			if (key_y.response_val != 0)
 			{
-				rpw.response_match_weight -= eta * (y - 1.0f) * rpw.response_match_weight;
-				rpw.response_pattern_weight[key_y.response_val] -= eta * (y - 1.0f) * rpw.response_pattern_weight[key_y.response_val];
+				// rollout policy
+				rpw.response_match_weight -= delta_weight_y(rollout_y, rpw.response_match_weight);
+				update_weight_y(rpw.response_pattern_weight, key_y.response_val, rollout_y);
+				// tree policy
+				tpw.response_match_weight -= delta_weight_y(tree_y, tpw.response_match_weight);
+				update_weight_y(tpw.response_pattern_weight, key_y.response_val, tree_y);
 			}
 			// アタリを助ける手か
-			if (atari_save.bit_test(xy))
+			if (key_y.is_save_atari)
 			{
-				rpw.save_atari_weight -= eta * (y - 1.0f) * rpw.save_atari_weight;
+				// rollout policy
+				rpw.save_atari_weight -= delta_weight_y(rollout_y, rpw.save_atari_weight);
+				// tree policy
+				tpw.save_atari_weight -= delta_weight_y(tree_y, tpw.save_atari_weight);
 			}
 			// 直前の手に隣接する手か
-			if (is_neighbour(board, xy))
+			if (key_y.is_neighbour)
 			{
-				rpw.neighbour_weight -= eta * (y - 1.0f) * rpw.neighbour_weight;
+				// rollout policy
+				rpw.neighbour_weight -= delta_weight_y(rollout_y, rpw.neighbour_weight);
+				// tree policy
+				tpw.neighbour_weight -= delta_weight_y(tree_y, tpw.neighbour_weight);
 			}
+			// アタリになる手か(ならない方を評価)
+			if (!key_y.is_self_atari)
+			{
+				// tree policy
+				tpw.self_atari_weight -= delta_weight_y(tree_y, tpw.self_atari_weight);
+			}
+			// 直前の2手からの距離
+			for (int move = 0; move < 2; move++)
+			{
+				if (board.pre_xy[move] != PASS)
+				{
+					XY distance = get_distance(xy, board.pre_xy[move]);
+					/*if (distance == 0 && move == 0)
+					{
+						printf("turn = %d : move = %s, (%d, %d), (%d, %d)\n", turn, next, get_x(xy), get_y(xy), get_x(board.pre_xy[move]), get_y(board.pre_xy[move]));
+						exit(0);
+					}*/
+					if (distance < sizeof(tpw.last_move_distance_weight[0]) / sizeof(tpw.last_move_distance_weight[0][0]))
+					{
+						tpw.last_move_distance_weight[move][distance] -= delta_weight_y(tree_y, tpw.last_move_distance_weight[move][distance]);
+					}
+				}
+			}
+			// 12-point diamondパターン
+			update_weight_y(tpw.diamond12_pattern_weight, key_y.diamond12_val, tree_y);
 
 			// 損失関数
-			loss += -logf(y);
-			loss_cnt++;
+			rollout_loss += -logf(rollout_y);
+			rollout_loss_cnt++;
+			tree_loss += -logf(tree_y);
+			tree_loss_cnt++;
 
 			// 教師データと一致しない手のパラメータ更新
 			for (int i = 0; i < num; i++)
 			{
-				float y_etc = e_etc[i] / e_sum;
-				if (keys[i].nonresponse_val == 0)
+				float rollout_y_etc = rollout_e_etc[i] / rollout_e_sum;
+				float tree_y_etc = tree_e_etc[i] / tree_e_sum;
+				if (keys[i].nonresponse_val != 0) // 空白パターンは制約条件として更新しない
 				{
-					// 空白パターンは固定値として更新しない
-				}
-				else
-				{
-					rpw.nonresponse_pattern_weight[keys[i].nonresponse_val] -= eta * y_etc * rpw.nonresponse_pattern_weight[keys[i].nonresponse_val];
+					// rollout policy
+					update_weight_y_etc(rpw.nonresponse_pattern_weight, keys[i].nonresponse_val, rollout_y_etc);
+					// tree policy
+					update_weight_y_etc(tpw.nonresponse_pattern_weight, keys[i].nonresponse_val, tree_y_etc);
 				}
 				if (keys[i].response_val != 0)
 				{
-					rpw.response_match_weight -= eta * y_etc * rpw.response_match_weight;
-					rpw.response_pattern_weight[keys[i].response_val] -= eta * y_etc * rpw.response_pattern_weight[keys[i].response_val];
+					// rollout policy
+					rpw.response_match_weight -= delta_weight_y_etc(rollout_y_etc, rpw.response_match_weight);
+					update_weight_y_etc(rpw.response_pattern_weight, keys[i].response_val, rollout_y_etc);
+					// tree policy
+					tpw.response_match_weight -= delta_weight_y_etc(tree_y_etc, tpw.response_match_weight);
+					update_weight_y_etc(tpw.response_pattern_weight, keys[i].response_val, tree_y_etc);
 				}
 				// アタリを助ける手か
-				if (atari_save.bit_test(keys[i].xy))
+				if (keys[i].is_save_atari)
 				{
-					rpw.save_atari_weight -= eta * y_etc * rpw.save_atari_weight;
+					// rollout policy
+					rpw.save_atari_weight -= delta_weight_y_etc(rollout_y_etc, rpw.save_atari_weight);
+					// tree policy
+					tpw.save_atari_weight -= delta_weight_y_etc(tree_y_etc, tpw.save_atari_weight);
 				}
 				// 直前の手に隣接する手か
-				if (is_neighbour(board, keys[i].xy))
+				if (keys[i].is_neighbour)
 				{
-					rpw.neighbour_weight -= eta * y_etc * rpw.neighbour_weight;
+					// rollout policy
+					rpw.neighbour_weight -= delta_weight_y_etc(rollout_y_etc, rpw.neighbour_weight);
+					// tree policy
+					tpw.neighbour_weight -= delta_weight_y_etc(tree_y_etc, tpw.neighbour_weight);
 				}
+				// アタリになる手か(ならない方を評価)
+				if (!keys[i].is_self_atari)
+				{
+					// tree policy
+					tpw.self_atari_weight -= delta_weight_y_etc(tree_y_etc, tpw.self_atari_weight);
+				}
+				// 直前の2手からの距離
+				for (int move = 0; move < 2; move++)
+				{
+					if (board.pre_xy[move] != PASS)
+					{
+						XY distance = get_distance(keys[i].xy, board.pre_xy[move]);
+						/*if (distance == 0 && move == 0)
+						{
+							printf("turn = %d : move = %s, (%d, %d), (%d, %d)\n", turn, next, get_x(xy), get_y(xy), get_x(board.pre_xy[move]), get_y(board.pre_xy[move]));
+							exit(0);
+						}*/
+						if (distance < sizeof(tpw.last_move_distance_weight[0]) / sizeof(tpw.last_move_distance_weight[0][0]))
+						{
+							tpw.last_move_distance_weight[move][distance] -= delta_weight_y_etc(tree_y_etc, tpw.last_move_distance_weight[move][distance]);
+						}
+					}
+				}
+				// 12-point diamondパターン
+				update_weight_y_etc(tpw.diamond12_pattern_weight, keys[i].diamond12_val, tree_y_etc);
 			}
 
 			learned_position_num++;
@@ -422,7 +599,7 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num)
 	}
 
 	// 損失関数の平均値表示
-	printf("%S : loss = %f\n", infile, loss / loss_cnt);
+	printf("%S : rollout loss = %.5f, tree loss = %.5f\n", infile, rollout_loss / rollout_loss_cnt, tree_loss / tree_loss_cnt);
 
 	fclose(fp);
 
@@ -443,6 +620,7 @@ void read_pattern()
 		fread(&response, sizeof(response), 1, fp);
 
 		rpw.response_pattern_weight.insert({ response, 1.0f });
+		tpw.response_pattern_weight.insert({ response, 1.0f });
 	}
 	fclose(fp);
 
@@ -458,6 +636,22 @@ void read_pattern()
 		fread(&nonresponse, sizeof(nonresponse), 1, fp);
 
 		rpw.nonresponse_pattern_weight.insert({ nonresponse, 1.0f });
+		tpw.nonresponse_pattern_weight.insert({ nonresponse, 1.0f });
+	}
+	fclose(fp);
+
+	fp = fopen("diamond12.ptn", "rb");
+	if (fp == NULL)
+	{
+		fprintf(stderr, "diamond12.ptn read error\n");
+		return;
+	}
+	while (feof(fp) == 0)
+	{
+		Diamond12PatternVal diamond12;
+		fread(&diamond12, sizeof(diamond12), 1, fp);
+
+		tpw.diamond12_pattern_weight.insert({ diamond12, 1.0f });
 	}
 	fclose(fp);
 }
@@ -471,6 +665,18 @@ void learn_pattern(const wchar_t* dirs)
 	rpw.save_atari_weight = 1.0f;
 	rpw.neighbour_weight = 1.0f;
 	rpw.response_match_weight = 1.0f;
+
+	tpw.save_atari_weight = 1.0f;
+	tpw.neighbour_weight = 1.0f;
+	tpw.response_match_weight = 1.0f;
+	tpw.self_atari_weight = 1.0f;
+	for (int move = 0; move < 2; move++)
+	{
+		for (int i = 0; i < sizeof(tpw.last_move_distance_weight[0]) / sizeof(tpw.last_move_distance_weight[0][0]); i++)
+		{
+			tpw.last_move_distance_weight[move][i] = 1.0f;
+		}
+	}
 
 	// パターン読み込む
 	read_pattern();
@@ -486,7 +692,7 @@ void learn_pattern(const wchar_t* dirs)
 	}
 	fclose(fp_dirlist);
 
-	float iteration_eta[] = { 0.1f, 0.01f, 0.001f };
+	float iteration_eta[] = { 0.01f, 0.001f };
 	// 棋譜を読み込んで学習
 	for (float eta_tmp : iteration_eta)
 	{
@@ -513,60 +719,157 @@ void learn_pattern(const wchar_t* dirs)
 		}
 	}
 
-	printf("response pattern weight num = %d\n", rpw.response_pattern_weight.size());
-	printf("nonresponse pattern weight num = %d\n", rpw.nonresponse_pattern_weight.size());
+	// 学習結果表示
+	// rollout policy
+	printf("rollout policy response pattern weight num = %d\n", rpw.response_pattern_weight.size());
+	printf("rollout policy nonresponse pattern weight num = %d\n", rpw.nonresponse_pattern_weight.size());
 
 	// 重み順にソート
-	multimap<float, ResponsePatternVal> response_weight_sorted;
-	multimap<float, NonResponsePatternVal> nonresponse_weight_sorted;
+	multimap<float, ResponsePatternVal> rpw_response_weight_sorted;
+	multimap<float, NonResponsePatternVal> rpw_nonresponse_weight_sorted;
 	for (auto itr : rpw.response_pattern_weight)
 	{
 		if (itr.second > 0.01f)
 		{
-			response_weight_sorted.insert({ itr.second, itr.first });
+			rpw_response_weight_sorted.insert({ itr.second, itr.first });
 		}
 	}
 	for (auto itr : rpw.nonresponse_pattern_weight)
 	{
 		if (itr.second > 0.01f)
 		{
-			nonresponse_weight_sorted.insert({ itr.second, itr.first });
+			rpw_nonresponse_weight_sorted.insert({ itr.second, itr.first });
 		}
 	}
 
-	printf("response pattern weight output num = %d\n", response_weight_sorted.size());
-	printf("nonresponse pattern weight output num = %d\n", nonresponse_weight_sorted.size());
+	printf("rollout policy response pattern weight output num = %d\n", rpw_response_weight_sorted.size());
+	printf("rollout policy nonresponse pattern weight output num = %d\n", rpw_nonresponse_weight_sorted.size());
 
-	printf("save atari weight = %f\n", rpw.save_atari_weight);
-	printf("neighbour_weight = %f\n", rpw.neighbour_weight);
-	printf("response match weight = %f\n", rpw.response_match_weight);
+	printf("rollout policy save atari weight = %f\n", rpw.save_atari_weight);
+	printf("rollout policy neighbour weight = %f\n", rpw.neighbour_weight);
+	printf("rollout policy response match weight = %f\n", rpw.response_match_weight);
 	// Top10
 	int n = 0;
-	for (auto itr = response_weight_sorted.rbegin(); itr != response_weight_sorted.rend() && n < 10; itr++, n++)
+	for (auto itr = rpw_response_weight_sorted.rbegin(); itr != rpw_response_weight_sorted.rend() && n < 10; itr++, n++)
 	{
-		printf("response pattern weight : %llx : %f\n", itr->second, itr->first);
+		printf("rollout policy response pattern weight : %llx : %f\n", itr->second, itr->first);
 	}
 	n = 0;
-	for (auto itr = nonresponse_weight_sorted.rbegin(); itr != nonresponse_weight_sorted.rend() && n < 10; itr++, n++)
+	for (auto itr = rpw_nonresponse_weight_sorted.rbegin(); itr != rpw_nonresponse_weight_sorted.rend() && n < 10; itr++, n++)
 	{
-		printf("nonresponse pattern weight : %llx : %f\n", itr->second, itr->first);
+		printf("rollout policy nonresponse pattern weight : %llx : %f\n", itr->second, itr->first);
+	}
+
+	// tree policy
+	printf("tree policy response pattern weight num = %d\n", tpw.response_pattern_weight.size());
+	printf("tree policy nonresponse pattern weight num = %d\n", tpw.nonresponse_pattern_weight.size());
+	printf("tree policy diamond12 pattern weight num = %d\n", tpw.diamond12_pattern_weight.size());
+
+	multimap<float, ResponsePatternVal> tpw_response_weight_sorted;
+	multimap<float, NonResponsePatternVal> tpw_nonresponse_weight_sorted;
+	multimap<float, Diamond12PatternVal> tpw_diamond12_weight_sorted;
+	for (auto itr : tpw.response_pattern_weight)
+	{
+		if (itr.second > 0.01f)
+		{
+			tpw_response_weight_sorted.insert({ itr.second, itr.first });
+		}
+	}
+	for (auto itr : tpw.nonresponse_pattern_weight)
+	{
+		if (itr.second > 0.01f)
+		{
+			tpw_nonresponse_weight_sorted.insert({ itr.second, itr.first });
+		}
+	}
+	for (auto itr : tpw.diamond12_pattern_weight)
+	{
+		if (itr.second > 0.01f)
+		{
+			tpw_diamond12_weight_sorted.insert({ itr.second, itr.first });
+		}
+	}
+
+	printf("tree policy response pattern weight output num = %d\n", tpw_response_weight_sorted.size());
+	printf("tree policy nonresponse pattern weight output num = %d\n", tpw_nonresponse_weight_sorted.size());
+	printf("tree policy diamond12 pattern weight output num = %d\n", tpw_diamond12_weight_sorted.size());
+
+	printf("tree policy save atari weight = %f\n", tpw.save_atari_weight);
+	printf("tree policy neighbour weight = %f\n", tpw.neighbour_weight);
+	printf("tree policy response match weight = %f\n", tpw.response_match_weight);
+	printf("tree policy self atari weight = %f\n", tpw.self_atari_weight);
+	for (int move = 0; move < 2; move++)
+	{
+		printf("tree policy last move distance %d = ", move);
+		for (int i = 0; i < sizeof(tpw.last_move_distance_weight[0]) / sizeof(tpw.last_move_distance_weight[0][0]); i++)
+		{
+			printf("%f ", tpw.last_move_distance_weight[move][i]);
+		}
+		printf("\n");
+	}
+	// Top10
+	n = 0;
+	for (auto itr = tpw_response_weight_sorted.rbegin(); itr != tpw_response_weight_sorted.rend() && n < 10; itr++, n++)
+	{
+		printf("tree policy response pattern weight : %llx : %f\n", itr->second, itr->first);
+	}
+	n = 0;
+	for (auto itr = tpw_nonresponse_weight_sorted.rbegin(); itr != tpw_nonresponse_weight_sorted.rend() && n < 10; itr++, n++)
+	{
+		printf("tree policy nonresponse pattern weight : %lx : %f\n", itr->second, itr->first);
+	}
+	n = 0;
+	for (auto itr = tpw_diamond12_weight_sorted.rbegin(); itr != tpw_diamond12_weight_sorted.rend() && n < 10; itr++, n++)
+	{
+		printf("tree policy diamond12 pattern weight : %llx : %f\n", itr->second, itr->first);
 	}
 
 	// 重み出力
+	// rollout policy
 	FILE* fp_weight = fopen("rollout.bin", "wb");
 	fwrite(&rpw.save_atari_weight, sizeof(rpw.save_atari_weight), 1, fp_weight);
 	fwrite(&rpw.neighbour_weight, sizeof(rpw.neighbour_weight), 1, fp_weight);
 	fwrite(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
-	int num = response_weight_sorted.size();
+	int num = rpw_response_weight_sorted.size();
 	fwrite(&num, sizeof(num), 1, fp_weight);
-	for (auto itr = response_weight_sorted.rbegin(); itr != response_weight_sorted.rend(); itr++)
+	for (auto itr = rpw_response_weight_sorted.rbegin(); itr != rpw_response_weight_sorted.rend(); itr++)
 	{
 		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
 		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
 	}
-	num = nonresponse_weight_sorted.size();
+	num = rpw_nonresponse_weight_sorted.size();
 	fwrite(&num, sizeof(num), 1, fp_weight);
-	for (auto itr = nonresponse_weight_sorted.rbegin(); itr != nonresponse_weight_sorted.rend(); itr++)
+	for (auto itr = rpw_nonresponse_weight_sorted.rbegin(); itr != rpw_nonresponse_weight_sorted.rend(); itr++)
+	{
+		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
+		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
+	}
+	fclose(fp_weight);
+
+	// tree policy
+	fp_weight = fopen("tree.bin", "wb");
+	fwrite(&tpw.save_atari_weight, sizeof(tpw.save_atari_weight), 1, fp_weight);
+	fwrite(&tpw.neighbour_weight, sizeof(tpw.neighbour_weight), 1, fp_weight);
+	fwrite(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
+	fwrite(&tpw.self_atari_weight, sizeof(tpw.self_atari_weight), 1, fp_weight);
+	fwrite(&tpw.last_move_distance_weight, sizeof(tpw.last_move_distance_weight), 1, fp_weight);
+	num = tpw_response_weight_sorted.size();
+	fwrite(&num, sizeof(num), 1, fp_weight);
+	for (auto itr = tpw_response_weight_sorted.rbegin(); itr != tpw_response_weight_sorted.rend(); itr++)
+	{
+		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
+		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
+	}
+	num = tpw_nonresponse_weight_sorted.size();
+	fwrite(&num, sizeof(num), 1, fp_weight);
+	for (auto itr = tpw_nonresponse_weight_sorted.rbegin(); itr != tpw_nonresponse_weight_sorted.rend(); itr++)
+	{
+		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
+		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
+	}
+	num = tpw_diamond12_weight_sorted.size();
+	fwrite(&num, sizeof(num), 1, fp_weight);
+	for (auto itr = tpw_diamond12_weight_sorted.rbegin(); itr != tpw_diamond12_weight_sorted.rend(); itr++)
 	{
 		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
 		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
@@ -872,10 +1175,14 @@ void check_hash()
 void dump_weight()
 {
 	// 重み順にソート
-	multimap<float, ResponsePatternVal> response_weight_sorted;
-	multimap<float, NonResponsePatternVal> nonresponse_weight_sorted;
+	multimap<float, ResponsePatternVal> rollout_response_weight_sorted;
+	multimap<float, NonResponsePatternVal> rollout_nonresponse_weight_sorted;
+	multimap<float, ResponsePatternVal> tree_response_weight_sorted;
+	multimap<float, NonResponsePatternVal> tree_nonresponse_weight_sorted;
+	multimap<float, Diamond12PatternVal> tree_diamond12_weight_sorted;
 
 	// 重み読み込み
+	// rollout policy
 	FILE* fp_weight = fopen("rollout.bin", "rb");
 	fread(&rpw.save_atari_weight, sizeof(rpw.save_atari_weight), 1, fp_weight);
 	fread(&rpw.neighbour_weight, sizeof(rpw.neighbour_weight), 1, fp_weight);
@@ -888,7 +1195,7 @@ void dump_weight()
 		float weight;
 		fread(&val, sizeof(val), 1, fp_weight);
 		fread(&weight, sizeof(weight), 1, fp_weight);
-		response_weight_sorted.insert({ weight, val });
+		rollout_response_weight_sorted.insert({ weight, val });
 	}
 	fread(&num, sizeof(num), 1, fp_weight);
 	for (int i = 0; i < num; i++)
@@ -897,42 +1204,133 @@ void dump_weight()
 		float weight;
 		fread(&val, sizeof(val), 1, fp_weight);
 		fread(&weight, sizeof(weight), 1, fp_weight);
-		nonresponse_weight_sorted.insert({ weight, val });
+		rollout_nonresponse_weight_sorted.insert({ weight, val });
 	}
 	fclose(fp_weight);
 
 	// 表示
-	printf("response pattern weight output num = %d\n", response_weight_sorted.size());
-	printf("nonresponse pattern weight output num = %d\n", nonresponse_weight_sorted.size());
+	printf("rollout response pattern weight output num = %d\n", rollout_response_weight_sorted.size());
+	printf("rollout nonresponse pattern weight output num = %d\n", rollout_nonresponse_weight_sorted.size());
 
-	printf("save atari weight = %f\n", rpw.save_atari_weight);
-	printf("neighbour_weight = %f\n", rpw.neighbour_weight);
-	printf("response match weight = %f\n", rpw.response_match_weight);
+	printf("rollout save atari weight = %f\n", rpw.save_atari_weight);
+	printf("rollout neighbour_weight = %f\n", rpw.neighbour_weight);
+	printf("rollout response match weight = %f\n", rpw.response_match_weight);
 
 	// Top10
 	printf("Top10\n");
 	int n = 0;
-	for (auto itr = response_weight_sorted.rbegin(); itr != response_weight_sorted.rend() && n < 10; itr++, n++)
+	for (auto itr = rollout_response_weight_sorted.rbegin(); itr != rollout_response_weight_sorted.rend() && n < 10; itr++, n++)
 	{
-		printf("response pattern weight : %llx : %f\n", itr->second, itr->first);
+		printf("rollout response pattern weight : %llx : %f\n", itr->second, itr->first);
 	}
 	n = 0;
-	for (auto itr = nonresponse_weight_sorted.rbegin(); itr != nonresponse_weight_sorted.rend() && n < 10; itr++, n++)
+	for (auto itr = rollout_nonresponse_weight_sorted.rbegin(); itr != rollout_nonresponse_weight_sorted.rend() && n < 10; itr++, n++)
 	{
-		printf("nonresponse pattern weight : %lx : %f\n", itr->second, itr->first);
+		printf("rollout nonresponse pattern weight : %lx : %f\n", itr->second, itr->first);
+	}
+
+	// Bottom10
+	printf("Bottom10\n");
+	n = 0;
+	for (auto itr = rollout_response_weight_sorted.begin(); itr != rollout_response_weight_sorted.end() && n < 10; itr++, n++)
+	{
+		printf("rollout response pattern weight : %llx : %f\n", itr->second, itr->first);
+	}
+	n = 0;
+	for (auto itr = rollout_nonresponse_weight_sorted.begin(); itr != rollout_nonresponse_weight_sorted.end() && n < 10; itr++, n++)
+	{
+		printf("rollout nonresponse pattern weight : %lx : %f\n", itr->second, itr->first);
+	}
+
+	// tree policy
+	fp_weight = fopen("tree.bin", "rb");
+	fread(&tpw.save_atari_weight, sizeof(tpw.save_atari_weight), 1, fp_weight);
+	fread(&tpw.neighbour_weight, sizeof(tpw.neighbour_weight), 1, fp_weight);
+	fread(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
+	fread(&tpw.self_atari_weight, sizeof(tpw.self_atari_weight), 1, fp_weight);
+	fread(&tpw.last_move_distance_weight, sizeof(tpw.last_move_distance_weight), 1, fp_weight);
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		ResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		tree_response_weight_sorted.insert({ weight, val });
+	}
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		NonResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		tree_nonresponse_weight_sorted.insert({ weight, val });
+	}
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		Diamond12PatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		tree_diamond12_weight_sorted.insert({ weight, val });
+	}
+	fclose(fp_weight);
+
+	// 表示
+	printf("tree response pattern weight output num = %d\n", tree_response_weight_sorted.size());
+	printf("tree nonresponse pattern weight output num = %d\n", tree_nonresponse_weight_sorted.size());
+	printf("tree diamond12 pattern weight output num = %d\n", tree_diamond12_weight_sorted.size());
+
+	printf("tree save atari weight = %f\n", tpw.save_atari_weight);
+	printf("tree neighbour_weight = %f\n", tpw.neighbour_weight);
+	printf("tree response match weight = %f\n", tpw.response_match_weight);
+	printf("tree policy self atari weight = %f\n", tpw.self_atari_weight);
+	for (int move = 0; move < 2; move++)
+	{
+		printf("tree policy last move distance %d = ", move);
+		for (int i = 0; i < sizeof(tpw.last_move_distance_weight[0]) / sizeof(tpw.last_move_distance_weight[0][0]); i++)
+		{
+			printf("%f ", tpw.last_move_distance_weight[move][i]);
+		}
+		printf("\n");
 	}
 
 	// Top10
-	printf("Bottom10\n");
+	printf("Top10\n");
 	n = 0;
-	for (auto itr = response_weight_sorted.begin(); itr != response_weight_sorted.end() && n < 10; itr++, n++)
+	for (auto itr = tree_response_weight_sorted.rbegin(); itr != tree_response_weight_sorted.rend() && n < 10; itr++, n++)
 	{
-		printf("response pattern weight : %llx : %f\n", itr->second, itr->first);
+		printf("tree response pattern weight : %llx : %f\n", itr->second, itr->first);
 	}
 	n = 0;
-	for (auto itr = nonresponse_weight_sorted.begin(); itr != nonresponse_weight_sorted.end() && n < 10; itr++, n++)
+	for (auto itr = tree_nonresponse_weight_sorted.rbegin(); itr != tree_nonresponse_weight_sorted.rend() && n < 10; itr++, n++)
 	{
-		printf("nonresponse pattern weight : %lx : %f\n", itr->second, itr->first);
+		printf("tree nonresponse pattern weight : %lx : %f\n", itr->second, itr->first);
+	}
+	n = 0;
+	for (auto itr = tree_diamond12_weight_sorted.rbegin(); itr != tree_diamond12_weight_sorted.rend() && n < 10; itr++, n++)
+	{
+		printf("tree diamond12 pattern weight : %llx : %f\n", itr->second, itr->first);
+	}
+
+	// Bottom10
+	printf("Bottom10\n");
+	n = 0;
+	for (auto itr = tree_response_weight_sorted.begin(); itr != tree_response_weight_sorted.end() && n < 10; itr++, n++)
+	{
+		printf("tree response pattern weight : %llx : %f\n", itr->second, itr->first);
+	}
+	n = 0;
+	for (auto itr = tree_nonresponse_weight_sorted.begin(); itr != tree_nonresponse_weight_sorted.end() && n < 10; itr++, n++)
+	{
+		printf("tree nonresponse pattern weight : %lx : %f\n", itr->second, itr->first);
+	}
+	n = 0;
+	for (auto itr = tree_diamond12_weight_sorted.begin(); itr != tree_diamond12_weight_sorted.end() && n < 10; itr++, n++)
+	{
+		printf("tree diamond12 pattern weight : %llx : %f\n", itr->second, itr->first);
 	}
 }
 

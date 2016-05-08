@@ -389,10 +389,16 @@ extern ResponsePatternVal response_pattern(const Board& board, const XY xy, cons
 extern NonResponsePatternVal nonresponse_pattern(const Board& board, const XY xy, const Color color);
 extern Diamond12PatternVal diamond12_pattern(const Board& board, const XY xy, const Color color);
 
+inline XY get_distance(const XY xy1, const XY xy2)
+{
+	XY dxy = xy1 - xy2;
+	return abs(get_x(dxy)) + abs(get_y(dxy));
+}
+
 inline bool is_neighbour(const Board& board, XY xy)
 {
-	XY dx = get_x(xy) - get_x(board.pre_xy);
-	XY dy = get_y(xy) - get_y(board.pre_xy);
+	XY dx = get_x(xy) - get_x(board.pre_xy[0]);
+	XY dy = get_y(xy) - get_y(board.pre_xy[0]);
 
 	return abs(dx) <= 1 && abs(dy) <= 1;
 }
@@ -423,7 +429,7 @@ struct TreePolicyWeight : public RolloutPolicyWeight
 	float self_atari_weight;
 
 	// 2手前からの距離
-	float pre_distance_weight[2][17];
+	float last_move_distance_weight[2][17];
 
 	// ノンレスポンスパターン(12-point diamond)
 	std::map<Diamond12PatternVal, float> diamond12_pattern_weight;

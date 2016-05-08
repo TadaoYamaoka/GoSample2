@@ -158,7 +158,7 @@ public:
 	FixedList<Group, GROUP_SIZE_MAX> groups;
 
 	XY ko;
-	XY pre_xy;
+	XY pre_xy[2];
 
 	// 石の数
 	int stone_num[3];
@@ -193,7 +193,7 @@ public:
 		DIR4[2] = -BOARD_WIDTH;
 		DIR4[3] = BOARD_WIDTH;
 		ko = -1;
-		pre_xy = -1;
+		pre_xy[0] = pre_xy[1] = -1;
 	}
 
 	const Color operator[](const XY xy) const {
@@ -259,5 +259,14 @@ public:
 
 	// アタリを助ける手か（シチョウ判定有）
 	bool is_atari_save_with_ladder_search(const Color color, const XY xy) const;
+
+	// アタリになる手か
+	bool is_self_atari(const Color color, const XY xy) const;
+
+private:
+	void push_pre_xy(const XY xy) {
+		pre_xy[1] = pre_xy[0];
+		pre_xy[0] = xy;
+	}
 };
 

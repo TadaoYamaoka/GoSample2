@@ -179,7 +179,7 @@ ResponsePatternVal response_pattern(const Board& board, const XY xy, const Color
 	}
 
 	// 直前の手の12ポイント範囲内か
-	XY d = xy - board.pre_xy;
+	XY d = xy - board.pre_xy[0];
 	XY dx = get_x(d);
 	XY dy = get_y(d);
 	if (abs(dx) + abs(dy) > 2)
@@ -187,7 +187,7 @@ ResponsePatternVal response_pattern(const Board& board, const XY xy, const Color
 		return 0;
 	}
 
-	ResponsePatternVal val = get_diamon12_pattern_val(board, board.pre_xy, color);
+	ResponsePatternVal val = get_diamon12_pattern_val(board, board.pre_xy[0], color);
 
 	val.vals.move_pos = (dy + 2) * 5 + (dx + 2);
 	return get_min_pattern_key(val);

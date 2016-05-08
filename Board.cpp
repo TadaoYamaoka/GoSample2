@@ -14,7 +14,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 	// パスの場合
 	if (xy == PASS) {
 		ko = -1;
-		pre_xy = PASS;
+		push_pre_xy(PASS);
 		return SUCCESS;
 	}
 
@@ -233,7 +233,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 		ko = -1;
 	}
 
-	pre_xy = xy;
+	push_pre_xy(xy);
 	return SUCCESS;
 }
 
@@ -314,7 +314,7 @@ void Board::move_legal(const XY xy, const Color color)
 	// パスの場合
 	if (xy == PASS) {
 		ko = -1;
-		pre_xy = PASS;
+		push_pre_xy(PASS);
 		return;
 	}
 
@@ -506,7 +506,7 @@ void Board::move_legal(const XY xy, const Color color)
 		ko = -1;
 	}
 
-	pre_xy = xy;
+	push_pre_xy(xy);
 }
 
 // アタリを助ける手を取得
@@ -779,6 +779,51 @@ bool Board::is_atari_save_with_ladder_search(const Color color, const XY xy) con
 				return true;
 			}
 		}
+	}
+
+	return false;
+}
+
+// アタリになる手か
+bool Board::is_self_atari(const Color color, const XY xy) const
+{
+	// 1手打った後に呼吸点が1になるか
+	int liberty_num = 0;
+	int capture_num = 0;
+	for (XY d : DIR4)
+	{
+		XY xyd = xy + d;
+		if (is_empty(xyd))
+		{
+			liberty_num++;
+			continue;
+		}
+		if (is_offboard(xyd))
+		{
+			continue;
+		}
+
+		const Group& adjacent_group = get_group(xyd);
+
+		if (adjacent_group.color == color)
+		{
+			liberty_num += adjacent_group.liberty_num - 1;
+		}
+		else
+		{
+			// 取ることができるか
+			if (adjacent_group.liberty_num == 1)
+			{
+				liberty_num++;
+				capture_num += adjacent_group.stone_num;
+			}
+		}
+	}
+
+	// 打った後の呼吸点が1でコウにならない
+	if (liberty_num == 1 && capture_num != 1)
+	{
+		return true;
 	}
 
 	return false;
