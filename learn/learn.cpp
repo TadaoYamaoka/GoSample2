@@ -1172,6 +1172,122 @@ void check_hash()
 	printf("nonresponse pattern collision num = %d\n", collision_num);
 }
 
+inline void print_response_pattern_stone(const ResponsePatternVal& val, const int n)
+{
+	const int move_idx[] = {
+		0, 0, 1, 0, 0,
+		0, 2, 3, 4, 0,
+		5, 6, 0, 7, 8,
+		0, 9, 10, 11, 0,
+		0, 0, 12, 0, 0
+	};
+	if (move_idx[val.vals.move_pos] == n)
+	{
+		printf("| × ");
+	}
+	else
+	{
+		Color color = (val.val64 >> ((n - 1) * 4)) & 0b11ull;
+		int liberty_num = (val.val64 >> ((n - 1) * 4 + 2)) & 0b11ull;
+		printf("| %s%d", color == BLACK ? "●" : "○", liberty_num);
+	}
+}
+
+void print_response_pattern(const ResponsePatternVal& val)
+{
+	// 1段目
+	printf("| 　 | 　 ");
+	print_response_pattern_stone(val, 1);
+	printf("| 　 | 　 |\n");
+	// 2段目
+	printf("| 　 ");
+	print_response_pattern_stone(val, 2);
+	print_response_pattern_stone(val, 3);
+	print_response_pattern_stone(val, 4);
+	printf("| 　 |\n");
+	// 3段目
+	print_response_pattern_stone(val, 5);
+	print_response_pattern_stone(val, 6);
+	printf("| ◎ ");
+	print_response_pattern_stone(val, 7);
+	print_response_pattern_stone(val, 8);
+	printf("|\n");
+	// 4段目
+	printf("| 　 ");
+	print_response_pattern_stone(val, 9);
+	print_response_pattern_stone(val, 10);
+	print_response_pattern_stone(val, 11);
+	printf("| 　 |\n");
+	// 5段目
+	printf("| 　 | 　 ");
+	print_response_pattern_stone(val, 12);
+	printf("| 　 | 　 |\n");
+}
+
+inline void print_nonresponse_pattern_stone(const NonResponsePatternVal& val, const int n)
+{
+	Color color = (val.val32 >> ((n - 1) * 4)) & 0b11ull;
+	int liberty_num = (val.val32 >> ((n - 1) * 4 + 2)) & 0b11ull;
+	printf("| %s%d", color == BLACK ? "●" : "○", liberty_num);
+}
+
+void print_nonresponse_pattern(const NonResponsePatternVal& val)
+{
+	// 2段目
+	print_nonresponse_pattern_stone(val, 1);
+	print_nonresponse_pattern_stone(val, 2);
+	print_nonresponse_pattern_stone(val, 3);
+	printf("|\n");
+	// 3段目
+	print_nonresponse_pattern_stone(val, 4);
+	printf("| × ");
+	print_nonresponse_pattern_stone(val, 5);
+	printf("|\n");
+	// 4段目
+	print_nonresponse_pattern_stone(val, 6);
+	print_nonresponse_pattern_stone(val, 7);
+	print_nonresponse_pattern_stone(val, 8);
+	printf("|\n");
+}
+
+inline void print_diamond12_pattern_stone(const Diamond12PatternVal& val, const int n)
+{
+	Color color = (val.val64 >> ((n - 1) * 4))& 0b11ull;
+	int liberty_num = (val.val64 >> ((n - 1) * 4 + 2)) & 0b11ull;
+	printf("| %s%d", color == BLACK ? "●" : "○", liberty_num);
+}
+
+void print_diamond12_pattern(const Diamond12PatternVal& val)
+{
+	// 1段目
+	printf("| 　 | 　 ");
+	print_diamond12_pattern_stone(val, 1);
+	printf("| 　 | 　 |\n");
+	// 2段目
+	printf("| 　 ");
+	print_diamond12_pattern_stone(val, 2);
+	print_diamond12_pattern_stone(val, 3);
+	print_diamond12_pattern_stone(val, 4);
+	printf("| 　 |\n");
+	// 3段目
+	print_diamond12_pattern_stone(val, 5);
+	print_diamond12_pattern_stone(val, 6);
+	printf("| × ");
+	print_diamond12_pattern_stone(val, 7);
+	print_diamond12_pattern_stone(val, 8);
+	printf("|\n");
+	// 4段目
+	printf("| 　 ");
+	print_diamond12_pattern_stone(val, 9);
+	print_diamond12_pattern_stone(val, 10);
+	print_diamond12_pattern_stone(val, 11);
+	printf("| 　 |\n");
+	// 5段目
+	printf("| 　 | 　 ");
+	print_diamond12_pattern_stone(val, 12);
+	printf("| 　 | 　 |\n");
+}
+
 void dump_weight()
 {
 	// 重み順にソート
@@ -1221,11 +1337,31 @@ void dump_weight()
 	int n = 0;
 	for (auto itr = rollout_response_weight_sorted.rbegin(); itr != rollout_response_weight_sorted.rend() && n < 10; itr++, n++)
 	{
+		if (n == 0)
+		{
+			print_response_pattern(itr->second);
+			printf("rotate\n");
+			print_response_pattern(itr->second.rotate());
+			printf("vmirror\n");
+			print_response_pattern(itr->second.vmirror());
+			printf("hmirror\n");
+			print_response_pattern(itr->second.hmirror());
+		}
 		printf("rollout response pattern weight : %llx : %f\n", itr->second, itr->first);
 	}
 	n = 0;
 	for (auto itr = rollout_nonresponse_weight_sorted.rbegin(); itr != rollout_nonresponse_weight_sorted.rend() && n < 10; itr++, n++)
 	{
+		if (n == 0)
+		{
+			print_nonresponse_pattern(itr->second);
+			printf("rotate\n");
+			print_nonresponse_pattern(itr->second.rotate());
+			printf("vmirror\n");
+			print_nonresponse_pattern(itr->second.vmirror());
+			printf("hmirror\n");
+			print_nonresponse_pattern(itr->second.hmirror());
+		}
 		printf("rollout nonresponse pattern weight : %lx : %f\n", itr->second, itr->first);
 	}
 
@@ -1302,16 +1438,46 @@ void dump_weight()
 	n = 0;
 	for (auto itr = tree_response_weight_sorted.rbegin(); itr != tree_response_weight_sorted.rend() && n < 10; itr++, n++)
 	{
+		if (n == 0)
+		{
+			print_response_pattern(itr->second);
+			printf("rotate\n");
+			print_response_pattern(itr->second.rotate());
+			printf("vmirror\n");
+			print_response_pattern(itr->second.vmirror());
+			printf("hmirror\n");
+			print_response_pattern(itr->second.hmirror());
+		}
 		printf("tree response pattern weight : %llx : %f\n", itr->second, itr->first);
 	}
 	n = 0;
 	for (auto itr = tree_nonresponse_weight_sorted.rbegin(); itr != tree_nonresponse_weight_sorted.rend() && n < 10; itr++, n++)
 	{
+		if (n == 0)
+		{
+			print_nonresponse_pattern(itr->second);
+			printf("rotate\n");
+			print_nonresponse_pattern(itr->second.rotate());
+			printf("vmirror\n");
+			print_nonresponse_pattern(itr->second.vmirror());
+			printf("hmirror\n");
+			print_nonresponse_pattern(itr->second.hmirror());
+		}
 		printf("tree nonresponse pattern weight : %lx : %f\n", itr->second, itr->first);
 	}
 	n = 0;
 	for (auto itr = tree_diamond12_weight_sorted.rbegin(); itr != tree_diamond12_weight_sorted.rend() && n < 10; itr++, n++)
 	{
+		if (n == 0)
+		{
+			print_diamond12_pattern(itr->second);
+			printf("rotate\n");
+			print_diamond12_pattern(itr->second.rotate());
+			printf("vmirror\n");
+			print_diamond12_pattern(itr->second.vmirror());
+			printf("hmirror\n");
+			print_diamond12_pattern(itr->second.hmirror());
+		}
 		printf("tree diamond12 pattern weight : %llx : %f\n", itr->second, itr->first);
 	}
 
