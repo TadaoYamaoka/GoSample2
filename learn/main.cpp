@@ -4,18 +4,30 @@
 
 int wmain(int argc, wchar_t** argv)
 {
-	if (argc < 3)
+	if (argc < 2)
 	{
 		return 1;
 	}
 
 	if (wcscmp(argv[1], L"prepare") == 0)
 	{
+		if (argc < 3)
+		{
+			return 1;
+		}
 		prepare_pattern(argv[2]);
 	}
 	else if (wcscmp(argv[1], L"learn") == 0)
 	{
-		learn_pattern(argv[2]);
+		if (argc < 7)
+		{
+			return 1;
+		}
+		int game_num = _wtoi(argv[3]);
+		int iteration_num = _wtoi(argv[4]);
+		float eta = _wtof(argv[5]);
+		float ramda = _wtof(argv[6]);
+		learn_pattern(argv[2], game_num, iteration_num, eta, ramda);
 	}
 	else if (wcscmp(argv[1], L"hash") == 0)
 	{
@@ -36,6 +48,18 @@ int wmain(int argc, wchar_t** argv)
 	else if (wcscmp(argv[1], L"dump") == 0)
 	{
 		dump_weight();
+	}
+	else if (wcscmp(argv[1], L"clean") == 0)
+	{
+		if (argc < 3)
+		{
+			return 1;
+		}
+		clean_kifu(argv[2]);
+	}
+	else if (wcscmp(argv[1], L"init") == 0)
+	{
+		init_weight();
 	}
 
 	return 0;

@@ -6,7 +6,7 @@
 using namespace std;
 
 // ƒpƒ‰ƒ[ƒ^“Ç‚İ‚İ
-extern void load_weight(const char* filepath);
+extern void load_weight(const wchar_t* filepath);
 
 class UCTPattern : public UCTParallel
 {

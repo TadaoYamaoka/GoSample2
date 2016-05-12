@@ -1,10 +1,6 @@
 #pragma once
 #include "Player.h"
 
-const int FPU = 10; // First Play Urgency
-const double C = 1.0; // UCB定数
-const int THR = 15; // ノード展開の閾値
-
 extern int PLAYOUT_MAX;
 
 class UCTNode
@@ -18,6 +14,9 @@ public:
 	UCTNode* child; // 子ノード
 
 	bool is_atari_save; // アタリを助ける手か
+
+	// tree policy
+	float probability;
 
 	bool expand_node(const Board& board);
 };

@@ -8,6 +8,10 @@ const int THREAD_NUM = 8; // 論理コア数
 const int THREAD_NUM = 1; // 論理コア数
 #endif // !_DEBUG
 
+const float C = 1.0; // UCB定数
+const int FPU = 10; // First Play Urgency
+const int THR = 15; // ノード展開の閾値
+
 extern thread_local Random random;
 
 extern UCTNode* create_root_node();
@@ -141,11 +145,11 @@ UCTNode* UCTSaveAtari::select_node_with_ucb(const Board& board, const Color colo
 		if (child->playout_num == 0)
 		{
 			// 未実行
-			ucb = FPU + double(random.random()) * FPU / RANDOM_MAX;
+			ucb = FPU + float(random.random()) * FPU / RANDOM_MAX;
 			ucb *= bonus;
 		}
 		else {
-			ucb = double(child->win_num) / child->playout_num + C * sqrt(log(node->playout_num_sum) / child->playout_num) * bonus;
+			ucb = float(child->win_num) / child->playout_num + C * sqrtf(logf(node->playout_num_sum) / child->playout_num) * bonus;
 		}
 
 		if (ucb > max_ucb)

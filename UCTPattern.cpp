@@ -1,11 +1,19 @@
+#include <string>
 #include "UCTPattern.h"
 #include "Random.h"
+
+using namespace std;
 
 #ifndef _DEBUG
 const int THREAD_NUM = 8; // 論理コア数
 #else
 const int THREAD_NUM = 1; // 論理コア数
 #endif // !_DEBUG
+
+const float CPUCT = 20.0f; // PUCT定数
+const float C = 1.0f; // UCB定数
+const float FPU = 1.0f; // First Play Urgency
+const int THR = 15; // ノード展開の閾値
 
 extern thread_local Random random;
 
@@ -17,10 +25,21 @@ extern void check_atari_save(const Board& board, const Color color, UCTNode* nod
 // rollout policyの重み
 RolloutPolicyWeight rpw;
 
-void load_weight(const char* filepath)
+// tree policyの重み
+TreePolicyWeight tpw;
+
+void load_weight(const wchar_t* dirpath)
 {
+	wstring path(dirpath);
+
 	// 重み読み込み
-	FILE* fp_weight = fopen(filepath, "rb");
+	// rollout policy
+	FILE* fp_weight = _wfopen((path + L"/rollout.bin").c_str(), L"rb");
+	if (fp_weight == NULL)
+	{
+		fprintf(stderr, "rollout.bin open error.\n");
+		exit(1);
+	}
 	fread(&rpw.save_atari_weight, sizeof(rpw.save_atari_weight), 1, fp_weight);
 	fread(&rpw.neighbour_weight, sizeof(rpw.neighbour_weight), 1, fp_weight);
 	fread(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
@@ -44,6 +63,141 @@ void load_weight(const char* filepath)
 		rpw.nonresponse_pattern_weight.insert({ val, weight });
 	}
 	fclose(fp_weight);
+
+	// tree policy
+	fp_weight = _wfopen((path + L"/tree.bin").c_str(), L"rb");
+	if (fp_weight == NULL)
+	{
+		fprintf(stderr, "tree.bin open error.\n");
+		exit(1);
+	}
+	fread(&tpw.save_atari_weight, sizeof(tpw.save_atari_weight), 1, fp_weight);
+	fread(&tpw.neighbour_weight, sizeof(tpw.neighbour_weight), 1, fp_weight);
+	fread(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
+	fread(&tpw.self_atari_weight, sizeof(tpw.self_atari_weight), 1, fp_weight);
+	fread(&tpw.last_move_distance_weight, sizeof(tpw.last_move_distance_weight), 1, fp_weight);
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		ResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		tpw.response_pattern_weight.insert({ val, weight });
+	}
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		NonResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		tpw.nonresponse_pattern_weight.insert({ val, weight });
+	}
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		Diamond12PatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		tpw.diamond12_pattern_weight.insert({ val, weight });
+	}
+	fclose(fp_weight);
+}
+
+template <typename T, typename K>
+float get_weight_map_val(const T& weightmap, const K& key)
+{
+	auto itr = weightmap.find(key);
+	if (itr == weightmap.end())
+	{
+		return 0;
+	}
+
+	return itr->second;
+}
+
+// 展開されたノードの着手確率をtree policyを使用して算出
+void compute_tree_policy(const Board& board, Color color, UCTNode* parent)
+{
+	float e_weight_sum = 0;
+
+	for (int i = 0; i < parent->child_num; i++)
+	{
+		UCTNode& node = parent->child[i];
+
+		if (node.xy == PASS)
+		{
+			node.probability = 0;
+			continue;
+		}
+
+		// レスポンスパターン
+		ResponsePatternVal response_val = response_pattern(board, node.xy, color);
+
+		// ノンレスポンスパターン
+		NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, node.xy, color);
+
+		// Diamond12パターン
+		Diamond12PatternVal diamond12_val = diamond12_pattern(board, node.xy, color);
+
+		// 重みの線形和
+		float tree_weight_sum = get_weight_map_val(tpw.nonresponse_pattern_weight, nonresponse_val);
+		if (response_val != 0)
+		{
+			tree_weight_sum += tpw.response_match_weight;
+			tree_weight_sum += get_weight_map_val(tpw.response_pattern_weight, response_val);
+		}
+		// アタリを助ける手か
+		if (board.is_atari_save_with_ladder_search(color, node.xy))
+		{
+			tree_weight_sum += tpw.save_atari_weight;
+		}
+		// 直前の手に隣接する手か
+		if (is_neighbour(board, node.xy))
+		{
+			tree_weight_sum += tpw.neighbour_weight;
+		}
+		// アタリになる手か
+		if (!board.is_self_atari(color, node.xy))
+		{
+			// ならない方を評価
+			tree_weight_sum += tpw.self_atari_weight;
+		}
+		// 直前2手からの距離
+		if (board.pre_xy[0] != PASS)
+		{
+			const XY distance = get_distance(node.xy, board.pre_xy[0]);
+			if (distance < sizeof(tpw.last_move_distance_weight[0]) / sizeof(tpw.last_move_distance_weight[0][0]))
+			{
+				tree_weight_sum += tpw.last_move_distance_weight[0][distance];
+			}
+		}
+		if (board.pre_xy[1] != PASS)
+		{
+			const XY distance = get_distance(node.xy, board.pre_xy[1]);
+			if (distance < sizeof(tpw.last_move_distance_weight[1]) / sizeof(tpw.last_move_distance_weight[1][0]))
+			{
+				tree_weight_sum += tpw.last_move_distance_weight[1][distance];
+			}
+		}
+		// 12-point diamondパターン
+		tree_weight_sum += get_weight_map_val(tpw.diamond12_pattern_weight, diamond12_val);
+
+		// 各手のsoftmaxを計算
+		node.probability = expf(tree_weight_sum);
+
+		e_weight_sum += node.probability;
+	}
+
+	// 合計で割って確率にする
+	for (int i = 0; i < parent->child_num; i++)
+	{
+		UCTNode& node = parent->child[i];
+
+		node.probability /= e_weight_sum;
+	}
 }
 
 // プレイアウト
@@ -141,7 +295,7 @@ int UCTPattern::playout(Board& board, const Color color)
 					const ResponsePatternVal response_val = response_pattern(board, xy, color_tmp);
 					if (response_val != 0)
 					{
-						//weight_sum += response_match_weight;
+						weight_sum += rpw.response_match_weight;
 						const auto itr = rpw.response_pattern_weight.find(response_val);
 						if (itr != rpw.response_pattern_weight.end())
 						{
@@ -239,31 +393,25 @@ int UCTPattern::playout(Board& board, const Color color)
 UCTNode* UCTPattern::select_node_with_ucb(const Board& board, const Color color, UCTNode* node)
 {
 	UCTNode* selected_node;
-	double max_ucb = -999;
+	float max_ucb = -999;
 	for (int i = 0; i < node->child_num; i++)
 	{
 		UCTNode* child = node->child + i;
 
-		double bonus = 1.0;
-		if (child->xy == PASS)
+		float ucb;
+		if (child->playout_num < 3)
 		{
-			// PASSに低いボーナス
-			bonus = 0.01;
+			// FPU
+			ucb = FPU + float(random.random()) * FPU / RANDOM_MAX;
+			//printf("xy = %d, probability = %f\n", child->xy, child->probability);
 		}
-		else if (child->is_atari_save) {
-			// アタリを助ける手にボーナス
-			bonus = 10.0;
-		}
-
-		double ucb;
-		if (child->playout_num == 0)
+		else if (child->playout_num < THR) // 閾値以下の場合tree policyを使用
 		{
-			// 未実行
-			ucb = FPU + double(random.random()) * FPU / RANDOM_MAX;
-			ucb *= bonus;
+			// PUCT
+			ucb = float(child->win_num) / child->playout_num + CPUCT * child->probability * sqrtf(logf(node->playout_num_sum)) / (1 + child->playout_num);
 		}
 		else {
-			ucb = double(child->win_num) / child->playout_num + C * sqrt(log(node->playout_num_sum) / child->playout_num) * bonus;
+			ucb = float(child->win_num) / child->playout_num + C * sqrtf(logf(node->playout_num_sum) / child->playout_num);
 		}
 
 		if (ucb > max_ucb)
@@ -309,8 +457,8 @@ int UCTPattern::search_uct(Board& board, const Color color, UCTNode* node)
 			// ノードを展開
 			if (selected_node->playout_num == THR && selected_node->expand_node(board))
 			{
-				// 展開されたノードがアタリを助ける手か調べる
-				check_atari_save(board, color, selected_node);
+				// 展開されたノードの着手確率をtree policyを使用して算出
+				compute_tree_policy(board, color, selected_node);
 
 				win = 1 - search_uct(board, opponent(color), selected_node);
 			}
@@ -357,8 +505,8 @@ void UCTPattern::search_uct_root(Board& board, const Color color, UCTNode* node,
 			// ノードを展開
 			if (selected_node_copy->expand_node(board))
 			{
-				// 展開されたノードがアタリを助ける手か調べる
-				check_atari_save(board, color, selected_node_copy);
+				// 展開されたノードの着手確率をtree policyを使用して算出
+				compute_tree_policy(board, color, selected_node_copy);
 
 				win = 1 - search_uct(board, opponent(color), selected_node_copy);
 			}
@@ -386,8 +534,8 @@ XY UCTPattern::select_move(Board& board, Color color)
 	// ノードを展開(合法手のみ)
 	expand_root_node(board, color, root);
 
-	// 展開されたノードがアタリを助ける手か調べる
-	check_atari_save(board, color, root);
+	// 展開されたノードの着手確率をtree policyを使用して算出
+	compute_tree_policy(board, color, root);
 
 	// root並列化
 	std::thread th[THREAD_NUM];
@@ -447,30 +595,23 @@ XY UCTPattern::select_move(Board& board, Color color)
 			}
 
 			double rate;
-			if (rate_min == 1)
+			rate = double(child->win_num) / child->playout_num;
+			if (rate < rate_min)
 			{
-				rate = double(child->win_num) / child->playout_num;
-				if (rate < rate_min)
-				{
-					rate_min = rate;
-				}
+				rate_min = rate;
 			}
-			if (rate_max == 0)
+			if (rate > rate_max)
 			{
-				rate = double(child->win_num) / child->playout_num;
-				if (rate > rate_max)
-				{
-					rate_max = rate;
-				}
+				rate_max = rate;
 			}
 		}
 	}
 
-	if (rate_min == 1)
+	if (rate_min >= 0.99)
 	{
 		return PASS;
 	}
-	if (rate_max == 0)
+	if (rate_max <= 0.01)
 	{
 		return PASS;
 	}

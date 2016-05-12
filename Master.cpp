@@ -64,8 +64,6 @@ void print_sfg();
 int wmain(int argc, wchar_t* argv[]) {
 	::hInstance = GetModuleHandle(NULL);
 
-	load_weight("learn/rollout.bin");
-
 	// ƒIƒvƒVƒ‡ƒ“
 	for (int i = 0; i < argc; i++)
 	{
@@ -150,6 +148,14 @@ int wmain(int argc, wchar_t* argv[]) {
 				{
 					players[1] = playerList[player_i];
 				}
+			}
+		}
+		else if (wcscmp(argv[i], L"-pattern") == 0)
+		{
+			if (i + 1 < argc)
+			{
+				i++;
+				load_weight(argv[i]);
 			}
 		}
 		else {

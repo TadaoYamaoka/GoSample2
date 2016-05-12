@@ -4,6 +4,10 @@
 #include "UCTSample.h"
 #include "Debug.h"
 
+const float C = 1.0; // UCB定数
+const int FPU = 10; // First Play Urgency
+const int THR = 15; // ノード展開の閾値
+
 int PLAYOUT_MAX = 2000;
 
 const int NODE_MAX = 300000;
@@ -221,14 +225,14 @@ UCTNode* UCTSample::select_node_with_ucb(UCTNode* node)
 	for (int i = 0; i < node->child_num; i++)
 	{
 		UCTNode* child = node->child + i;
-		double ucb;
+		float ucb;
 		if (child->playout_num == 0)
 		{
 			// 未実行
-			ucb = FPU + double(random.random()) * FPU / RANDOM_MAX;
+			ucb = FPU + float(random.random()) * FPU / RANDOM_MAX;
 		}
 		else {
-			ucb = double(child->win_num) / child->playout_num + C * sqrt(log(node->playout_num_sum) / child->playout_num);
+			ucb = float(child->win_num) / child->playout_num + C * sqrtf(logf(node->playout_num_sum) / child->playout_num);
 		}
 
 		if (ucb > max_ucb)

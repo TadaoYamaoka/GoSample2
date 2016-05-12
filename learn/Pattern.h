@@ -392,14 +392,14 @@ extern Diamond12PatternVal diamond12_pattern(const Board& board, const XY xy, co
 
 inline XY get_distance(const XY xy1, const XY xy2)
 {
-	XY dxy = xy1 - xy2;
+	const XY dxy = xy1 - xy2;
 	return abs(get_x(dxy)) + abs(get_y(dxy));
 }
 
-inline bool is_neighbour(const Board& board, XY xy)
+inline bool is_neighbour(const Board& board, const XY xy)
 {
-	XY dx = get_x(xy) - get_x(board.pre_xy[0]);
-	XY dy = get_y(xy) - get_y(board.pre_xy[0]);
+	const XY dx = get_x(xy) - get_x(board.pre_xy[0]);
+	const XY dy = get_y(xy) - get_y(board.pre_xy[0]);
 
 	return abs(dx) <= 1 && abs(dy) <= 1;
 }
