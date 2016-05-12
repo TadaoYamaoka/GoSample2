@@ -106,7 +106,7 @@ int wmain(int argc, wchar_t* argv[]) {
 			if (i + 1 < argc)
 			{
 				i++;
-				double komi = _wtof(argv[i]);
+				float komi = _wtof(argv[i]);
 				if (komi >= 0 && komi < GRID_SIZE * GRID_SIZE)
 				{
 					KOMI = komi;

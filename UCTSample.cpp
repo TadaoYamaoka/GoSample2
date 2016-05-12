@@ -86,7 +86,7 @@ Color UCTSample::end_game(const Board& board)
 	// ’†‘ƒ‹[ƒ‹‚Å”‚¦‚é
 	int score = board.stone_num[BLACK] - board.stone_num[WHITE];
 	int eye_num = BOARD_STONE_MAX - (board.stone_num[BLACK] + board.stone_num[WHITE]);
-	double final_score = score - KOMI;
+	float final_score = score - KOMI;
 
 	// Šá‚ð”‚¦‚È‚­‚Ä‚àŸ”s‚ªŒˆ‚Ü‚éê‡
 	if (final_score - eye_num > 0)

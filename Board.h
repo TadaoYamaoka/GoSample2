@@ -13,7 +13,7 @@ const int BOARD_SIZE_MAX = 19;
 const int GROUP_SIZE_MAX = BOARD_SIZE_MAX * BOARD_SIZE_MAX / 2;
 const int BOARD_BYTE_MAX = (BOARD_SIZE_MAX + 1) * (BOARD_SIZE_MAX + 2) + 1;
 
-extern double KOMI;
+extern float KOMI;
 
 typedef short XY;
 

@@ -4,7 +4,7 @@ int BOARD_SIZE = 9;
 int BOARD_WIDTH = BOARD_SIZE + 1;
 int BOARD_STONE_MAX = BOARD_SIZE * BOARD_SIZE;
 int BOARD_MAX = BOARD_WIDTH * (BOARD_SIZE + 2);
-double KOMI = 6.5;
+float KOMI = 6.5;
 XY DIR4[4];
 
 MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
