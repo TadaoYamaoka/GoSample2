@@ -458,7 +458,7 @@ int UCTPattern::search_uct(Board& board, const Color color, UCTNode* node)
 			if (selected_node->playout_num == THR && selected_node->expand_node(board))
 			{
 				// 展開されたノードの着手確率をtree policyを使用して算出
-				compute_tree_policy(board, color, selected_node);
+				compute_tree_policy(board, opponent(color), selected_node);
 
 				win = 1 - search_uct(board, opponent(color), selected_node);
 			}
@@ -506,7 +506,7 @@ void UCTPattern::search_uct_root(Board& board, const Color color, UCTNode* node,
 			if (selected_node_copy->expand_node(board))
 			{
 				// 展開されたノードの着手確率をtree policyを使用して算出
-				compute_tree_policy(board, color, selected_node_copy);
+				compute_tree_policy(board, opponent(color), selected_node_copy);
 
 				win = 1 - search_uct(board, opponent(color), selected_node_copy);
 			}

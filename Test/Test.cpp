@@ -92,7 +92,7 @@ void print_child(UCTNode* root)
 	for (int i = 0; i < root->child_num; i++)
 	{
 		UCTNode* child = root->child + i;
-		printf("xy = %d, x,y = %d,%d : win = %d : playout_num = %d\n", child->xy, get_x(child->xy), get_y(child->xy), child->win_num, child->playout_num);
+		printf("xy = %d, x,y = %d,%d : win = %d : playout_num = %d : rate = %.2f\n", child->xy, get_x(child->xy), get_y(child->xy), child->win_num, child->playout_num, float(child->win_num) / child->playout_num);
 	}
 }
 
