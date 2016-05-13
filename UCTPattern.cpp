@@ -123,6 +123,12 @@ void compute_tree_policy(const Board& board, Color color, UCTNode* parent)
 {
 	float e_weight_sum = 0;
 
+	ResponsePatternVal response_base;
+	if (board.pre_xy[0] > PASS)
+	{
+		response_base = get_diamon12_pattern_val(board, board.pre_xy[0], color);
+	}
+
 	for (int i = 0; i < parent->child_num; i++)
 	{
 		UCTNode& node = parent->child[i];
@@ -134,13 +140,13 @@ void compute_tree_policy(const Board& board, Color color, UCTNode* parent)
 		}
 
 		// レスポンスパターン
-		ResponsePatternVal response_val = response_pattern(board, node.xy, color);
+		const ResponsePatternVal response_val = response_pattern(board, node.xy, color, response_base);
 
 		// ノンレスポンスパターン
-		NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, node.xy, color);
+		const NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, node.xy, color);
 
 		// Diamond12パターン
-		Diamond12PatternVal diamond12_val = diamond12_pattern(board, node.xy, color);
+		const Diamond12PatternVal diamond12_val = diamond12_pattern(board, node.xy, color);
 
 		// 重みの線形和
 		float tree_weight_sum = get_weight_map_val(tpw.nonresponse_pattern_weight, nonresponse_val);
@@ -265,6 +271,13 @@ int UCTPattern::playout(Board& board, const Color color)
 			}
 		}
 
+		// レスポンスパターンで共通となる12-point diamondパターンを計算
+		ResponsePatternVal response_base;
+		if (board.pre_xy[0] > PASS)
+		{
+			response_base = get_diamon12_pattern_val(board, board.pre_xy[0], color_tmp);
+		}
+
 		// 候補手一覧(合法手チェックなし)
 		int possibles_num = 0;
 		for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
@@ -292,7 +305,7 @@ int UCTPattern::playout(Board& board, const Color color)
 					weight_sum = non_response_weight_board[xy];
 
 					// Response pattern
-					const ResponsePatternVal response_val = response_pattern(board, xy, color_tmp);
+					const ResponsePatternVal response_val = response_pattern(board, xy, color_tmp, response_base);
 					if (response_val != 0)
 					{
 						weight_sum += rpw.response_match_weight;

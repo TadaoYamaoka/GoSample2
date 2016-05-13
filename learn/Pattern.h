@@ -386,7 +386,105 @@ struct NonResponsePatternVal
 	}
 };
 
+inline int get_liberty_val(const int liberty_num)
+{
+	return (liberty_num >= 3) ? 3 : liberty_num;
+}
+
+inline PatternVal64 get_diamon12_pattern_val(const Board& board, const XY xy, const Color color)
+{
+	PatternVal64 val64 = 0;
+
+	// 黒を基準にする
+	const Color color_mask = (color == BLACK) ? 0b00 : 0x11;
+
+	// 1段目
+	XY xyp = xy - BOARD_WIDTH * 2;
+	if (xyp > BOARD_WIDTH && !board.is_empty(xyp))
+	{
+		const Group& group = board.get_group(xyp);
+		val64 |= (uint64_t)((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2));
+	}
+
+	// 2段目
+	xyp = xy - BOARD_WIDTH - 1;
+	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
+	{
+		const Group& group = board.get_group(xyp);
+		val64 |= (uint64_t)((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 1);
+	}
+	xyp++;
+	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
+	{
+		const Group& group = board.get_group(xyp);
+		val64 |= (uint64_t)((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 2);
+	}
+	xyp++;
+	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
+	{
+		const Group& group = board.get_group(xyp);
+		val64 |= (uint64_t)((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 3);
+	}
+
+	// 3段目
+	xyp = xy - 2;
+	if (!board.is_empty(xyp) && !board.is_offboard(xyp) && !board.is_offboard(xyp + 1))
+	{
+		const Group& group = board.get_group(xyp);
+		val64 |= (uint64_t)((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 4);
+	}
+	xyp++;
+	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
+	{
+		const Group& group = board.get_group(xyp);
+		val64 |= (uint64_t)((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 5);
+	}
+	xyp += 2;
+	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
+	{
+		const Group& group = board.get_group(xyp);
+		val64 |= (uint64_t)((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 6);
+	}
+	xyp++;
+	if (!board.is_empty(xyp) && !board.is_offboard(xyp) && !board.is_offboard(xyp - 1))
+	{
+		const Group& group = board.get_group(xyp);
+		val64 |= (uint64_t)((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 7);
+	}
+
+	// 4段目
+	xyp = xy + BOARD_WIDTH - 1;
+	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
+	{
+		const Group& group = board.get_group(xyp);
+		val64 |= (uint64_t)((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 8);
+	}
+	xyp++;
+	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
+	{
+		const Group& group = board.get_group(xyp);
+		val64 |= (uint64_t)((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 9);
+	}
+	xyp++;
+	if (!board.is_empty(xyp) && !board.is_offboard(xyp))
+	{
+		const Group& group = board.get_group(xyp);
+		val64 |= (uint64_t)((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 10);
+	}
+
+	// 5段目
+	xyp = xy + BOARD_WIDTH * 2;
+	if (xyp < BOARD_MAX - BOARD_WIDTH && !board.is_empty(xyp))
+	{
+		const Group& group = board.get_group(xyp);
+		val64 |= (uint64_t)((group.color ^ color_mask) | (get_liberty_val(group.liberty_num) << 2)) << (4 * 11);
+	}
+
+	return val64;
+}
+
 extern ResponsePatternVal response_pattern(const Board& board, const XY xy, const Color color);
+extern ResponsePatternVal response_pattern(const Board& board, const XY xy, const Color color, const ResponsePatternVal& base);
 extern NonResponsePatternVal nonresponse_pattern(const Board& board, const XY xy, const Color color);
 extern Diamond12PatternVal diamond12_pattern(const Board& board, const XY xy, const Color color);
 
