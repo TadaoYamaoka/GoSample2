@@ -239,35 +239,15 @@ int UCTPattern::playout(Board& board, const Color color)
 			{
 				const XY xy = changed_group.stone[j];
 
-				const XY x = get_x(xy);
-				const XY y = get_y(xy);
-				XY x_min = x - 2;
-				if (x_min < 1)
-				{
-					x_min = 1;
-				}
-				XY x_max = x + 2;
-				if (x_max > BOARD_SIZE)
-				{
-					x_max = BOARD_SIZE;
-				}
-				XY y_min = y - 2;
-				if (y_min < 1)
-				{
-					y_min = 1;
-				}
-				XY y_max = y + 2;
-				if (y_max > BOARD_SIZE)
-				{
-					y_max = BOARD_SIZE;
-				}
-				for (XY y = y_min; y <= y_max; y++)
-				{
-					for (XY x = x_min; x <= x_min; x++)
-					{
-						non_response_weight_board[get_xy(x, y)] = 0;
-					}
-				}
+				// 周囲8マスを更新対象
+				non_response_weight_board[xy - BOARD_WIDTH - 1] = 0;
+				non_response_weight_board[xy - BOARD_WIDTH] = 0;
+				non_response_weight_board[xy - BOARD_WIDTH + 1] = 0;
+				non_response_weight_board[xy - 1] = 0;
+				non_response_weight_board[xy + 1] = 0;
+				non_response_weight_board[xy + BOARD_WIDTH - 1] = 0;
+				non_response_weight_board[xy + BOARD_WIDTH] = 0;
+				non_response_weight_board[xy + BOARD_WIDTH + 1] = 0;
 			}
 		}
 
