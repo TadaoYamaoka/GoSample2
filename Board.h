@@ -216,6 +216,10 @@ public:
 		return board[xy] == G_OFFBOARD;
 	}
 
+	bool is_stone(const XY xy) const {
+		return board[xy] < G_OFFBOARD;
+	}
+
 	MoveResult move(const XY xy, const Color color, const bool fill_eye_err = true);
 	MoveResult is_legal(const XY xy, const Color color, const bool fill_eye_err = true) const;
 	void move_legal(const XY xy, const Color color);
