@@ -29,6 +29,55 @@ RolloutPolicyWeightHash rpw;
 // tree policy‚Ìd‚İ
 TreePolicyWeightHash tpw;
 
+void set_pattern_hash(float* hash_tbl, const ResponsePatternVal& val, const float weight)
+{
+	hash_tbl[get_hash_key_response_pattern(val)] = weight;
+}
+
+void set_pattern_hash(float* hash_tbl, const NonResponsePatternVal& val, const float weight)
+{
+	hash_tbl[get_hash_key_nonresponse_pattern(val)] = weight;
+}
+
+void set_pattern_hash(float* hash_tbl, const Diamond12PatternVal& val, const float weight)
+{
+	hash_tbl[get_hash_key_diamond12_pattern(val)] = weight;
+}
+
+template<typename V>
+void set_rotated_pattern_hash(float* hash_tbl, const V& val, const float weight)
+{
+	set_pattern_hash(hash_tbl, val, weight);
+
+	// 90“x‰ñ“]
+	V rot = val.rotate();
+	set_pattern_hash(hash_tbl, rot, weight);
+
+	// 180“x‰ñ“]
+	rot = val.rotate();
+	set_pattern_hash(hash_tbl, rot, weight);
+
+	// 270“x‰ñ“]
+	rot = val.rotate();
+	set_pattern_hash(hash_tbl, rot, weight);
+
+	// ã‰º”½“]
+	rot = val.vmirror();
+	set_pattern_hash(hash_tbl, rot, weight);
+
+	// 90“x‰ñ“]
+	rot = rot.rotate();
+	set_pattern_hash(hash_tbl, rot, weight);
+
+	// ¶‰E”½“]
+	rot = val.hmirror();
+	set_pattern_hash(hash_tbl, rot, weight);
+
+	// 90“x‰ñ“]
+	rot = rot.rotate();
+	set_pattern_hash(hash_tbl, rot, weight);
+}
+
 void load_weight(const wchar_t* dirpath)
 {
 	init_hash_table_and_weight(9999999619ull);
@@ -54,7 +103,7 @@ void load_weight(const wchar_t* dirpath)
 		float weight;
 		fread(&val, sizeof(val), 1, fp_weight);
 		fread(&weight, sizeof(weight), 1, fp_weight);
-		rpw.response_pattern_weight[get_hash_key_response_pattern(val)] = weight;
+		set_rotated_pattern_hash(rpw.response_pattern_weight, val, weight);
 	}
 	fread(&num, sizeof(num), 1, fp_weight);
 	for (int i = 0; i < num; i++)
@@ -63,7 +112,7 @@ void load_weight(const wchar_t* dirpath)
 		float weight;
 		fread(&val, sizeof(val), 1, fp_weight);
 		fread(&weight, sizeof(weight), 1, fp_weight);
-		rpw.nonresponse_pattern_weight[get_hash_key_nonresponse_pattern(val)] = weight;
+		set_rotated_pattern_hash(rpw.nonresponse_pattern_weight, val, weight);
 	}
 	fclose(fp_weight);
 
@@ -86,7 +135,7 @@ void load_weight(const wchar_t* dirpath)
 		float weight;
 		fread(&val, sizeof(val), 1, fp_weight);
 		fread(&weight, sizeof(weight), 1, fp_weight);
-		tpw.response_pattern_weight[get_hash_key_response_pattern(val)] = weight;
+		set_rotated_pattern_hash(tpw.response_pattern_weight, val, weight);
 	}
 	fread(&num, sizeof(num), 1, fp_weight);
 	for (int i = 0; i < num; i++)
@@ -95,7 +144,7 @@ void load_weight(const wchar_t* dirpath)
 		float weight;
 		fread(&val, sizeof(val), 1, fp_weight);
 		fread(&weight, sizeof(weight), 1, fp_weight);
-		tpw.nonresponse_pattern_weight[get_hash_key_nonresponse_pattern(val)] = weight;
+		set_rotated_pattern_hash(tpw.nonresponse_pattern_weight, val, weight);
 	}
 	fread(&num, sizeof(num), 1, fp_weight);
 	for (int i = 0; i < num; i++)
@@ -104,7 +153,7 @@ void load_weight(const wchar_t* dirpath)
 		float weight;
 		fread(&val, sizeof(val), 1, fp_weight);
 		fread(&weight, sizeof(weight), 1, fp_weight);
-		tpw.diamond12_pattern_weight[get_hash_key_diamond12_pattern(val)] = weight;
+		set_rotated_pattern_hash(tpw.diamond12_pattern_weight, val, weight);
 	}
 	fclose(fp_weight);
 }

@@ -60,7 +60,7 @@ T get_min_pattern_key(const T& val)
 	return min;
 }
 
-Diamond12PatternVal diamond12_pattern(const Board& board, const XY xy, const Color color)
+Diamond12PatternVal diamond12_pattern_min(const Board& board, const XY xy, const Color color)
 {
 	Diamond12PatternVal val = get_diamon12_pattern_val(board, xy, color);
 	if (val == 0)
@@ -70,7 +70,7 @@ Diamond12PatternVal diamond12_pattern(const Board& board, const XY xy, const Col
 	return get_min_pattern_key(val);
 }
 
-ResponsePatternVal response_pattern(const Board& board, const XY xy, const Color color)
+ResponsePatternVal response_pattern_min(const Board& board, const XY xy, const Color color)
 {
 	if (board.pre_xy[0] <= PASS)
 	{
@@ -112,7 +112,7 @@ ResponsePatternVal response_pattern(const Board& board, const XY xy, const Color
 	ResponsePatternVal val = base;
 
 	val.vals.move_pos = (dy + 2) * 5 + (dx + 2);
-	return get_min_pattern_key(val);
+	return val;
 }
 
 NonResponsePatternVal nonresponse_pattern(const Board& board, const XY xy, const Color color)
@@ -176,5 +176,10 @@ NonResponsePatternVal nonresponse_pattern(const Board& board, const XY xy, const
 		val.val32 |= (group.pattern_val ^ color_mask) << (4 * 7);
 	}
 
-	return get_min_pattern_key(val);
+	return val;
+}
+
+NonResponsePatternVal nonresponse_pattern_min(const Board& board, const XY xy, const Color color)
+{
+	return get_min_pattern_key(nonresponse_pattern(board, xy, color));
 }

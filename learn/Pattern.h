@@ -482,10 +482,16 @@ inline PatternVal64 get_diamon12_pattern_val(const Board& board, const XY xy, co
 	return val64;
 }
 
-extern ResponsePatternVal response_pattern(const Board& board, const XY xy, const Color color);
+extern ResponsePatternVal response_pattern_min(const Board& board, const XY xy, const Color color);
 extern ResponsePatternVal response_pattern(const Board& board, const XY xy, const Color color, const ResponsePatternVal& base);
 extern NonResponsePatternVal nonresponse_pattern(const Board& board, const XY xy, const Color color);
-extern Diamond12PatternVal diamond12_pattern(const Board& board, const XY xy, const Color color);
+extern NonResponsePatternVal nonresponse_pattern_min(const Board& board, const XY xy, const Color color);
+extern Diamond12PatternVal diamond12_pattern_min(const Board& board, const XY xy, const Color color);
+
+inline Diamond12PatternVal diamond12_pattern(const Board& board, const XY xy, const Color color)
+{
+	return get_diamon12_pattern_val(board, xy, color);
+}
 
 inline XY get_distance(const XY xy1, const XY xy2)
 {

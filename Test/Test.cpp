@@ -569,7 +569,7 @@ void test_pattern_001()
 
 	debug_print_board(board);
 
-	ResponsePatternVal val = response_pattern(board, get_xy(3, 1), WHITE);
+	ResponsePatternVal val = response_pattern_min(board, get_xy(3, 1), WHITE);
 
 	print_response_pattern(val);
 }
@@ -592,7 +592,7 @@ void test_pattern_002()
 	init_board(board, test_board, 9);
 	debug_print_board(board);
 
-	NonResponsePatternVal val = nonresponse_pattern(board, get_xy(3, 3), WHITE);
+	NonResponsePatternVal val = nonresponse_pattern_min(board, get_xy(3, 3), WHITE);
 
 	print_nonresponse_pattern(val);
 }
@@ -615,7 +615,7 @@ void test_pattern_003()
 	init_board(board, test_board, 9);
 	debug_print_board(board);
 
-	Diamond12PatternVal val = diamond12_pattern(board, get_xy(3, 3), WHITE);
+	Diamond12PatternVal val = diamond12_pattern_min(board, get_xy(3, 3), WHITE);
 
 	print_diamond12_pattern(val);
 }

@@ -487,13 +487,13 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* er
 				{
 					// 候補手パターン
 					// レスポンスパターン
-					ResponsePatternVal response_val = response_pattern(board, txy, color);
+					ResponsePatternVal response_val = response_pattern_min(board, txy, color);
 
 					// ノンレスポンスパターン
-					NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, txy, color);
+					NonResponsePatternVal nonresponse_val = nonresponse_pattern_min(board, txy, color);
 
 					// Diamond12パターン
-					Diamond12PatternVal diamond12_val = diamond12_pattern(board, txy, color);
+					Diamond12PatternVal diamond12_val = diamond12_pattern_min(board, txy, color);
 
 					bool is_save_atari_tmp = false;
 					bool is_self_atari_tmp = false;
@@ -1334,18 +1334,18 @@ int prepare_pattern_sgf(const wchar_t* infile, map<ResponsePatternVal, int>& res
 				{
 					// 候補手パターン
 					// レスポンスパターン
-					ResponsePatternVal response_val = response_pattern(board, txy, color);
+					ResponsePatternVal response_val = response_pattern_min(board, txy, color);
 					if (response_val != 0)
 					{
 						response_pattern_map[response_val]++;
 					}
 
 					// ノンレスポンスパターン
-					NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, txy, color);
+					NonResponsePatternVal nonresponse_val = nonresponse_pattern_min(board, txy, color);
 					nonresponse_pattern_map[nonresponse_val]++;
 
 					// 12-point diamondパターン
-					Diamond12PatternVal diamond12_val = diamond12_pattern(board, txy, color);
+					Diamond12PatternVal diamond12_val = diamond12_pattern_min(board, txy, color);
 					diamond12_pattern_map[diamond12_val]++;
 				}
 			}
@@ -1513,9 +1513,92 @@ void prepare_pattern(const wchar_t* dirs)
 	}
 }
 
+int insert_pattern_hash_collision(ResponsePatternVal* collision, const ResponsePatternVal& val)
+{
+	const HashKey key = get_hash_key_response_pattern(val);
+
+	// 衝突検出
+	if (collision[key] == 0)
+	{
+		collision[key] = val;
+		return 0;
+	}
+	else if (collision[key] != val)
+	{
+		return 1;
+	}
+}
+
+int insert_pattern_hash_collision(NonResponsePatternVal* collision, const NonResponsePatternVal& val)
+{
+	const HashKey key = get_hash_key_nonresponse_pattern(val);
+
+	// 衝突検出
+	if (collision[key] == 0)
+	{
+		collision[key] = val;
+		return 0;
+	}
+	else if (collision[key] != val)
+	{
+		return 1;
+	}
+}
+
+int insert_pattern_hash_collision(Diamond12PatternVal* collision, const Diamond12PatternVal& val)
+{
+	const HashKey key = get_hash_key_diamond12_pattern(val);
+
+	// 衝突検出
+	if (collision[key] == 0)
+	{
+		collision[key] = val;
+		return 0;
+	}
+	else if (collision[key] != val)
+	{
+		return 1;
+	}
+}
+
+template<typename T, typename V>
+int insert_rotated_pattern_hash_collision(T* collision, const V& val)
+{
+	int collision_num = insert_pattern_hash_collision(collision, val);
+
+	// 90度回転
+	V rot = val.rotate();
+	collision_num += insert_pattern_hash_collision(collision, rot);
+
+	// 180度回転
+	rot = val.rotate();
+	collision_num += insert_pattern_hash_collision(collision, rot);
+
+	// 270度回転
+	rot = val.rotate();
+	collision_num += insert_pattern_hash_collision(collision, rot);
+
+	// 上下反転
+	rot = val.vmirror();
+	collision_num += insert_pattern_hash_collision(collision, rot);
+
+	// 90度回転
+	rot = rot.rotate();
+	collision_num += insert_pattern_hash_collision(collision, rot);
+
+	// 左右反転
+	rot = val.hmirror();
+	collision_num += insert_pattern_hash_collision(collision, rot);
+
+	// 90度回転
+	rot = rot.rotate();
+	collision_num += insert_pattern_hash_collision(collision, rot);
+
+	return collision_num;
+}
+
 void check_hash()
 {
-	int n = 0;
 	int collision_num = 0;
 	FILE* fp = fopen("response.ptn", "rb");
 	if (fp == NULL)
@@ -1528,24 +1611,12 @@ void check_hash()
 		ResponsePatternVal response;
 		fread(&response, sizeof(response), 1, fp);
 
-		// ハッシュ登録
-		HashKey key = get_hash_key_response_pattern(response);
 		// 衝突検出
-		if (response_pattern_collision[key] == 0)
-		{
-			response_pattern_collision[key] = response;
-		}
-		else if (response_pattern_collision[key] != response)
-		{
-			//fprintf(stderr, "response pattern collision : %d : %llx\n", n, response.val64);
-			collision_num++;
-		}
-		n++;
+		collision_num += insert_pattern_hash_collision(response_pattern_collision, response);
 	}
 	fclose(fp);
 	printf("response pattern collision num = %d\n", collision_num);
 
-	n = 0;
 	collision_num = 0;
 	fp = fopen("nonresponse.ptn", "rb");
 	if (fp == NULL)
@@ -1558,24 +1629,12 @@ void check_hash()
 		NonResponsePatternVal nonresponse;
 		fread(&nonresponse, sizeof(nonresponse), 1, fp);
 
-		// ハッシュ登録
-		HashKey key = get_hash_key_nonresponse_pattern(nonresponse);
 		// 衝突検出
-		if (nonresponse_pattern_collision[key] == 0)
-		{
-			nonresponse_pattern_collision[key] = nonresponse;
-		}
-		else if (nonresponse_pattern_collision[key] != nonresponse)
-		{
-			//fprintf(stderr, "nonresponse pattern collision : %d : %x\n", n, nonresponse.val32);
-			collision_num++;
-		}
-		n++;
+		collision_num += insert_pattern_hash_collision(nonresponse_pattern_collision, nonresponse);
 	}
 	fclose(fp);
 	printf("nonresponse pattern collision num = %d\n", collision_num);
 
-	n = 0;
 	collision_num = 0;
 	fp = fopen("diamond12.ptn", "rb");
 	if (fp == NULL)
@@ -1588,18 +1647,8 @@ void check_hash()
 		Diamond12PatternVal diamond12;
 		fread(&diamond12, sizeof(diamond12), 1, fp);
 
-		// ハッシュ登録
-		HashKey key = get_hash_key_diamond12_pattern(diamond12);
 		// 衝突検出
-		if (diamond12_pattern_collision[key] == 0)
-		{
-			diamond12_pattern_collision[key] = diamond12;
-		}
-		else if (diamond12_pattern_collision[key] != diamond12)
-		{
-			collision_num++;
-		}
-		n++;
+		collision_num += insert_pattern_hash_collision(diamond12_pattern_collision, diamond12);
 	}
 	fclose(fp);
 	printf("diamond12 pattern collision num = %d\n", collision_num);
