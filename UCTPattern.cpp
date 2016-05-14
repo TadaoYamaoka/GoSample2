@@ -1,6 +1,7 @@
 #include <string>
 #include "UCTPattern.h"
 #include "Random.h"
+#include "learn/Hash.h"
 
 using namespace std;
 
@@ -23,13 +24,15 @@ extern UCTNode* create_child_node(const int size);
 extern void check_atari_save(const Board& board, const Color color, UCTNode* node);
 
 // rollout policyの重み
-RolloutPolicyWeight rpw;
+RolloutPolicyWeightHash rpw;
 
 // tree policyの重み
-TreePolicyWeight tpw;
+TreePolicyWeightHash tpw;
 
 void load_weight(const wchar_t* dirpath)
 {
+	init_hash_table_and_weight(9999999619ull);
+
 	wstring path(dirpath);
 
 	// 重み読み込み
@@ -51,7 +54,7 @@ void load_weight(const wchar_t* dirpath)
 		float weight;
 		fread(&val, sizeof(val), 1, fp_weight);
 		fread(&weight, sizeof(weight), 1, fp_weight);
-		rpw.response_pattern_weight.insert({ val, weight });
+		rpw.response_pattern_weight[get_hash_key_response_pattern(val)] = weight;
 	}
 	fread(&num, sizeof(num), 1, fp_weight);
 	for (int i = 0; i < num; i++)
@@ -60,7 +63,7 @@ void load_weight(const wchar_t* dirpath)
 		float weight;
 		fread(&val, sizeof(val), 1, fp_weight);
 		fread(&weight, sizeof(weight), 1, fp_weight);
-		rpw.nonresponse_pattern_weight.insert({ val, weight });
+		rpw.nonresponse_pattern_weight[get_hash_key_nonresponse_pattern(val)] = weight;
 	}
 	fclose(fp_weight);
 
@@ -83,7 +86,7 @@ void load_weight(const wchar_t* dirpath)
 		float weight;
 		fread(&val, sizeof(val), 1, fp_weight);
 		fread(&weight, sizeof(weight), 1, fp_weight);
-		tpw.response_pattern_weight.insert({ val, weight });
+		tpw.response_pattern_weight[get_hash_key_response_pattern(val)] = weight;
 	}
 	fread(&num, sizeof(num), 1, fp_weight);
 	for (int i = 0; i < num; i++)
@@ -92,7 +95,7 @@ void load_weight(const wchar_t* dirpath)
 		float weight;
 		fread(&val, sizeof(val), 1, fp_weight);
 		fread(&weight, sizeof(weight), 1, fp_weight);
-		tpw.nonresponse_pattern_weight.insert({ val, weight });
+		tpw.nonresponse_pattern_weight[get_hash_key_nonresponse_pattern(val)] = weight;
 	}
 	fread(&num, sizeof(num), 1, fp_weight);
 	for (int i = 0; i < num; i++)
@@ -101,21 +104,9 @@ void load_weight(const wchar_t* dirpath)
 		float weight;
 		fread(&val, sizeof(val), 1, fp_weight);
 		fread(&weight, sizeof(weight), 1, fp_weight);
-		tpw.diamond12_pattern_weight.insert({ val, weight });
+		tpw.diamond12_pattern_weight[get_hash_key_diamond12_pattern(val)] = weight;
 	}
 	fclose(fp_weight);
-}
-
-template <typename T, typename K>
-float get_weight_map_val(const T& weightmap, const K& key)
-{
-	auto itr = weightmap.find(key);
-	if (itr == weightmap.end())
-	{
-		return 0;
-	}
-
-	return itr->second;
 }
 
 // 展開されたノードの着手確率をtree policyを使用して算出
@@ -149,11 +140,11 @@ void compute_tree_policy(const Board& board, Color color, UCTNode* parent)
 		const Diamond12PatternVal diamond12_val = diamond12_pattern(board, node.xy, color);
 
 		// 重みの線形和
-		float tree_weight_sum = get_weight_map_val(tpw.nonresponse_pattern_weight, nonresponse_val);
+		float tree_weight_sum = tpw.nonresponse_pattern_weight[get_hash_key_nonresponse_pattern(nonresponse_val)];
 		if (response_val != 0)
 		{
 			tree_weight_sum += tpw.response_match_weight;
-			tree_weight_sum += get_weight_map_val(tpw.response_pattern_weight, response_val);
+			tree_weight_sum += tpw.response_pattern_weight[get_hash_key_response_pattern(response_val)];
 		}
 		// アタリを助ける手か
 		if (board.is_atari_save_with_ladder_search(color, node.xy))
@@ -189,7 +180,7 @@ void compute_tree_policy(const Board& board, Color color, UCTNode* parent)
 			}
 		}
 		// 12-point diamondパターン
-		tree_weight_sum += get_weight_map_val(tpw.diamond12_pattern_weight, diamond12_val);
+		tree_weight_sum += tpw.diamond12_pattern_weight[get_hash_key_diamond12_pattern(diamond12_val)];
 
 		// 各手のsoftmaxを計算
 		node.probability = expf(tree_weight_sum);
@@ -276,11 +267,7 @@ int UCTPattern::playout(Board& board, const Color color)
 					if (non_response_weight_board[xy] == 0)
 					{
 						const NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, xy, color_tmp);
-						const auto itr = rpw.nonresponse_pattern_weight.find(nonresponse_val);
-						if (itr != rpw.nonresponse_pattern_weight.end())
-						{
-							non_response_weight_board[xy] = itr->second;
-						}
+						non_response_weight_board[xy] = rpw.nonresponse_pattern_weight[get_hash_key_nonresponse_pattern(nonresponse_val)];
 					}
 					weight_sum = non_response_weight_board[xy];
 
@@ -289,11 +276,7 @@ int UCTPattern::playout(Board& board, const Color color)
 					if (response_val != 0)
 					{
 						weight_sum += rpw.response_match_weight;
-						const auto itr = rpw.response_pattern_weight.find(response_val);
-						if (itr != rpw.response_pattern_weight.end())
-						{
-							weight_sum += itr->second;
-						}
+						weight_sum += rpw.response_pattern_weight[get_hash_key_response_pattern(response_val)];
 
 						// 直前の手に隣接する手か
 						if (is_neighbour(board, xy))

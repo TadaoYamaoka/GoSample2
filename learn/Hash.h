@@ -45,3 +45,35 @@ inline HashKey get_hash_key_diamond12_pattern(const Diamond12PatternVal& val)
 		^ hash_key_pattern[4][val.vals.color_liberties[4]]
 		^ hash_key_pattern[5][val.vals.color_liberties[5]];
 }
+
+// rollout policyの重み
+struct RolloutPolicyWeightHash
+{
+	// アタリを防ぐ手の重み
+	float save_atari_weight;
+
+	// 直前の手と隣接
+	float neighbour_weight;
+
+	// レスポンスマッチの重み
+	float response_match_weight;
+
+	// レスポンスパターンの重み
+	float response_pattern_weight[HASH_KEY_MAX];
+
+	// ノンレスポンスパターンの重み
+	float nonresponse_pattern_weight[HASH_KEY_MAX];
+};
+
+// tree policyの重み
+struct TreePolicyWeightHash : public RolloutPolicyWeightHash
+{
+	// アタリになる手
+	float self_atari_weight;
+
+	// 2手前からの距離
+	float last_move_distance_weight[2][17];
+
+	// ノンレスポンスパターン(12-point diamond)
+	float diamond12_pattern_weight[HASH_KEY_MAX];
+};
