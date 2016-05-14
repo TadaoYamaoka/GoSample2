@@ -151,7 +151,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 			remove_group(around_group_self[i]);
 
 			// 変更した連に追加
-			pre_changed_group[pre_changed_group_num++] = around_group_self[i];
+			//pre_changed_group[pre_changed_group_num++] = around_group_self[i]; // つなげた連に含まれるため不要
 		}
 	}
 
@@ -431,7 +431,7 @@ void Board::move_legal(const XY xy, const Color color)
 			remove_group(around_group_self[i]);
 
 			// 変更した連に追加
-			pre_changed_group[pre_changed_group_num++] = around_group_self[i];
+			//pre_changed_group[pre_changed_group_num++] = around_group_self[i]; // つなげた連に含まれるため不要
 		}
 	}
 
