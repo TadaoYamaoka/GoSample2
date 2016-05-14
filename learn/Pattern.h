@@ -5,7 +5,6 @@
 typedef unsigned char PatternVal8;
 typedef unsigned int PatternVal32;
 typedef unsigned long long PatternVal64;
-typedef unsigned int HashKey;
 
 // 90“x‰ñ“](12-point diamond)
 inline PatternVal64 rotate_diamond12(const PatternVal64& val64)

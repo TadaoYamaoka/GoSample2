@@ -144,6 +144,7 @@
   <ItemGroup>
     <ClCompile Include="..\Board.cpp" />
     <ClCompile Include="..\Human.cpp" />
+    <ClCompile Include="..\learn\Hash.cpp" />
     <ClCompile Include="..\learn\learn.cpp" />
     <ClCompile Include="..\learn\Pattern.cpp" />
     <ClCompile Include="..\UCTParallel.cpp" />

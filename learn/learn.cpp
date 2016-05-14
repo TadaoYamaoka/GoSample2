@@ -7,6 +7,7 @@
 #include "../Board.h"
 #include "../Random.h"
 #include "Sgf.h"
+#include "Hash.h"
 
 using namespace std;
 
@@ -31,11 +32,6 @@ float eta = 0.01;
 
 // 正則化係数
 float ramda = 0.00000001;
-
-// パターン用ハッシュテーブル 12points
-const int HASH_KEY_MAX_PATTERN = 12 / 2; // color,libertiesのセット4byte * 2単位
-HashKey hash_key_pattern[HASH_KEY_MAX_PATTERN][256];
-HashKey hash_key_move_pos[5 * 5];
 
 struct WeightLoss
 {
@@ -63,6 +59,7 @@ map<Diamond12PatternVal, WeightLoss> tpw_diamond12_pattern_weight;
 // ハッシュキー衝突検出用
 ResponsePatternVal response_pattern_collision[HASH_KEY_MAX];
 NonResponsePatternVal nonresponse_pattern_collision[HASH_KEY_MAX];
+Diamond12PatternVal diamond12_pattern_collision[HASH_KEY_MAX];
 
 template <typename T>
 inline T sgn(const T val)
@@ -76,52 +73,6 @@ inline T sgn(const T val)
 		return -1;
 	}
 	return 0;
-}
-
-// 各色のパターン用ハッシュキー値生成
-void init_hash_table_and_weight(const uint64_t seed)
-{
-	// ハッシュテーブル初期化
-	Random random(seed);
-
-	for (int i = 0; i < HASH_KEY_MAX_PATTERN; i++)
-	{
-		for (int j = 0; j < 256; j++)
-		{
-			hash_key_pattern[i][j] = random.random() & HASH_KEY_MASK;
-		}
-	}
-
-	for (int i = 0; i < sizeof(hash_key_move_pos) / sizeof(hash_key_move_pos[0]); i++)
-	{
-		hash_key_move_pos[i] = random.random() & HASH_KEY_MASK;
-	}
-
-	// 衝突
-	memset(response_pattern_collision, 0, sizeof(ResponsePatternVal) * HASH_KEY_MAX);
-	memset(nonresponse_pattern_collision, 0, sizeof(NonResponsePatternVal) * HASH_KEY_MAX);
-}
-
-
-// レスポンスパターン用ハッシュキー値取得
-inline HashKey get_hash_key_response_pattern(const ResponsePatternVal& val)
-{
-	return hash_key_pattern[0][val.vals.color_liberties[0]]
-		^ hash_key_pattern[1][val.vals.color_liberties[1]]
-		^ hash_key_pattern[2][val.vals.color_liberties[2]]
-		^ hash_key_pattern[3][val.vals.color_liberties[3]]
-		^ hash_key_pattern[4][val.vals.color_liberties[4]]
-		^ hash_key_pattern[5][val.vals.color_liberties[5]]
-		^ hash_key_move_pos[val.vals.move_pos];
-}
-
-// ノンレスポンスパターン用ハッシュキー値取得
-HashKey get_hash_key_nonresponse_pattern(const NonResponsePatternVal& val)
-{
-	return hash_key_pattern[0][val.vals.color_liberties[0]]
-		^ hash_key_pattern[1][val.vals.color_liberties[1]]
-		^ hash_key_pattern[2][val.vals.color_liberties[2]]
-		^ hash_key_pattern[3][val.vals.color_liberties[3]];
 }
 
 // 文字列検索(UTF-8)
@@ -1623,6 +1574,35 @@ void check_hash()
 	}
 	fclose(fp);
 	printf("nonresponse pattern collision num = %d\n", collision_num);
+
+	n = 0;
+	collision_num = 0;
+	fp = fopen("diamond12.ptn", "rb");
+	if (fp == NULL)
+	{
+		fprintf(stderr, "diamond12.ptn read error\n");
+		return;
+	}
+	while (feof(fp) == 0)
+	{
+		Diamond12PatternVal diamond12;
+		fread(&diamond12, sizeof(diamond12), 1, fp);
+
+		// ハッシュ登録
+		HashKey key = get_hash_key_diamond12_pattern(diamond12);
+		// 衝突検出
+		if (diamond12_pattern_collision[key] == 0)
+		{
+			diamond12_pattern_collision[key] = diamond12;
+		}
+		else if (diamond12_pattern_collision[key] != diamond12)
+		{
+			collision_num++;
+		}
+		n++;
+	}
+	fclose(fp);
+	printf("diamond12 pattern collision num = %d\n", collision_num);
 }
 
 inline const char* get_color_str(const Color color)

@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include "learn.h"
+#include "Hash.h"
 
 int wmain(int argc, wchar_t** argv)
 {
@@ -39,11 +40,11 @@ int wmain(int argc, wchar_t** argv)
 		{
 			memset(response_pattern_collision, 0, sizeof(response_pattern_collision));
 			memset(nonresponse_pattern_collision, 0, sizeof(nonresponse_pattern_collision));
+			memset(diamond12_pattern_collision, 0, sizeof(diamond12_pattern_collision));
 			printf("seed = %lld\n", seed);
 			init_hash_table_and_weight(seed);
 			check_hash();
 		}
-		check_hash();
 	}
 	else if (wcscmp(argv[1], L"dump") == 0)
 	{
