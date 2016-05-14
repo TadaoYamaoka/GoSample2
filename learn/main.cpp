@@ -70,6 +70,10 @@ int wmain(int argc, wchar_t** argv)
 		}
 		print_pattern(argv[2], argv[3]);
 	}
+	else if (wcscmp(argv[1], L"sort") == 0)
+	{
+		sort_weight();
+	}
 
 	return 0;
 }

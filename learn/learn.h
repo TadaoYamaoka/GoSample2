@@ -13,6 +13,7 @@ extern void print_diamond12_pattern(const Diamond12PatternVal& val);
 extern void clean_kifu(const wchar_t* dirs);
 extern void init_weight();
 extern void print_pattern(const wchar_t* kind, const wchar_t* val);
+extern void sort_weight();
 
 // ハッシュキー衝突検出用
 extern ResponsePatternVal response_pattern_collision[HASH_KEY_MAX];

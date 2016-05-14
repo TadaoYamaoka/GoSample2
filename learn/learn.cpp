@@ -1949,6 +1949,148 @@ void dump_weight()
 	}
 }
 
+void sort_weight()
+{
+	RolloutPolicyWeight rpw;
+	TreePolicyWeight tpw;
+
+	// 重み順にソート
+	multimap<float, ResponsePatternVal> rpw_response_weight_sorted;
+	multimap<float, NonResponsePatternVal> rpw_nonresponse_weight_sorted;
+	multimap<float, ResponsePatternVal> tpw_response_weight_sorted;
+	multimap<float, NonResponsePatternVal> tpw_nonresponse_weight_sorted;
+	multimap<float, Diamond12PatternVal> tpw_diamond12_weight_sorted;
+
+	// 重み読み込み
+	// rollout policy
+	FILE* fp_weight = fopen("rollout.bin", "rb");
+	if (fp_weight == NULL)
+	{
+		fprintf(stderr, "rollout.bin file open error.\n");
+	}
+	fread(&rpw.save_atari_weight, sizeof(rpw.save_atari_weight), 1, fp_weight);
+	fread(&rpw.neighbour_weight, sizeof(rpw.neighbour_weight), 1, fp_weight);
+	fread(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
+	int num;
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		ResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		rpw_response_weight_sorted.insert({ weight, val });
+	}
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		NonResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		rpw_nonresponse_weight_sorted.insert({ weight, val });
+	}
+	fclose(fp_weight);
+
+	// tree policy
+	fp_weight = fopen("tree.bin", "rb");
+	if (fp_weight == NULL)
+	{
+		fprintf(stderr, "tree.bin file open error.\n");
+	}
+	fread(&tpw.save_atari_weight, sizeof(tpw.save_atari_weight), 1, fp_weight);
+	fread(&tpw.neighbour_weight, sizeof(tpw.neighbour_weight), 1, fp_weight);
+	fread(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
+	fread(&tpw.self_atari_weight, sizeof(tpw.self_atari_weight), 1, fp_weight);
+	fread(&tpw.last_move_distance_weight, sizeof(tpw.last_move_distance_weight), 1, fp_weight);
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		ResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		tpw_response_weight_sorted.insert({ weight, val });
+	}
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		NonResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		tpw_nonresponse_weight_sorted.insert({ weight, val });
+	}
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		Diamond12PatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		tpw_diamond12_weight_sorted.insert({ weight, val });
+	}
+	fclose(fp_weight);
+
+	// 重み出力
+	// rollout policy
+	fp_weight = fopen("rollout.bin", "wb");
+	fwrite(&rpw.save_atari_weight, sizeof(rpw.save_atari_weight), 1, fp_weight);
+	fwrite(&rpw.neighbour_weight, sizeof(rpw.neighbour_weight), 1, fp_weight);
+	fwrite(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
+	num = rpw_response_weight_sorted.size();
+	fwrite(&num, sizeof(num), 1, fp_weight);
+	for (auto itr = rpw_response_weight_sorted.begin(); itr != rpw_response_weight_sorted.end(); itr++)
+	{
+		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
+		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
+	}
+	num = rpw_nonresponse_weight_sorted.size();
+	fwrite(&num, sizeof(num), 1, fp_weight);
+	for (auto itr = rpw_nonresponse_weight_sorted.begin(); itr != rpw_nonresponse_weight_sorted.end(); itr++)
+	{
+		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
+		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
+	}
+	fclose(fp_weight);
+
+	// tree policy
+	fp_weight = fopen("tree.bin", "wb");
+	fwrite(&tpw.save_atari_weight, sizeof(tpw.save_atari_weight), 1, fp_weight);
+	fwrite(&tpw.neighbour_weight, sizeof(tpw.neighbour_weight), 1, fp_weight);
+	fwrite(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
+	fwrite(&tpw.self_atari_weight, sizeof(tpw.self_atari_weight), 1, fp_weight);
+	for (int move = 0; move < 2; move++)
+	{
+		for (int i = 0; i < sizeof(tpw.last_move_distance_weight[0]) / sizeof(tpw.last_move_distance_weight[0][0]); i++)
+		{
+			fwrite(&tpw.last_move_distance_weight[move][i], sizeof(tpw.last_move_distance_weight[move][i]), 1, fp_weight);
+		}
+	}
+	num = tpw_response_weight_sorted.size();
+	fwrite(&num, sizeof(num), 1, fp_weight);
+	for (auto itr = tpw_response_weight_sorted.begin(); itr != tpw_response_weight_sorted.end(); itr++)
+	{
+		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
+		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
+	}
+	num = tpw_nonresponse_weight_sorted.size();
+	fwrite(&num, sizeof(num), 1, fp_weight);
+	for (auto itr = tpw_nonresponse_weight_sorted.begin(); itr != tpw_nonresponse_weight_sorted.end(); itr++)
+	{
+		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
+		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
+	}
+	num = tpw_diamond12_weight_sorted.size();
+	fwrite(&num, sizeof(num), 1, fp_weight);
+	for (auto itr = tpw_diamond12_weight_sorted.begin(); itr != tpw_diamond12_weight_sorted.end(); itr++)
+	{
+		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
+		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
+	}
+	fclose(fp_weight);
+}
+
 void display_loss_graph()
 {
 	WNDCLASSEX wcex = { sizeof(WNDCLASSEX) };
