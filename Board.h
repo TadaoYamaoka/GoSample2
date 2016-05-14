@@ -74,6 +74,9 @@ public:
 	// 隣接する敵の連番号(ビットボード)
 	BitBoard<GROUP_SIZE_MAX> adjacent;
 
+	// パターン値
+	unsigned int pattern_val;
+
 	// 呼吸点が一致するか
 	bool hit_liberties(const XY xy) const {
 		return liberty_bitboard.bit_test(xy);

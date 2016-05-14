@@ -1,4 +1,5 @@
 #include "Board.h"
+#include "learn/Pattern.h"
 
 int BOARD_SIZE = 9;
 int BOARD_WIDTH = BOARD_SIZE + 1;
@@ -222,6 +223,13 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 
 		// 変更した連に追加
 		pre_changed_group[pre_changed_group_num++] = around_group_oponnent[i];
+	}
+
+	// パターン値更新
+	for (int i = 0; i < pre_changed_group_num; i++)
+	{
+		Group& changed_group = groups[pre_changed_group[i]];
+		changed_group.pattern_val = changed_group.color | get_pattern_liberty_val(changed_group.liberty_num);
 	}
 
 	// コウ
@@ -495,6 +503,13 @@ void Board::move_legal(const XY xy, const Color color)
 
 		// 変更した連に追加
 		pre_changed_group[pre_changed_group_num++] = around_group_oponnent[i];
+	}
+
+	// パターン値更新
+	for (int i = 0; i < pre_changed_group_num; i++)
+	{
+		Group& changed_group = groups[pre_changed_group[i]];
+		changed_group.pattern_val = changed_group.color | get_pattern_liberty_val(changed_group.liberty_num);
 	}
 
 	// コウ

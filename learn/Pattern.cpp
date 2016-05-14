@@ -120,26 +120,26 @@ NonResponsePatternVal nonresponse_pattern(const Board& board, const XY xy, const
 	NonResponsePatternVal val = { 0 };
 
 	// •‚ğŠî€‚É‚·‚é
-	const unsigned int color_mask = (color == BLACK) ? 0b00 : 0x11;
+	const unsigned int color_mask = (color == BLACK) ? 0b00 : 0b11;
 
 	// 1’i–Ú
 	XY xyp = xy - BOARD_WIDTH - 1;
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | get_pattern_liberty_val(group.liberty_num));
+		val.val32 |= (group.pattern_val ^ color_mask);
 	}
 	xyp++;
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | get_pattern_liberty_val(group.liberty_num)) << (4 * 1);
+		val.val32 |= (group.pattern_val ^ color_mask) << (4 * 1);
 	}
 	xyp++;
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | get_pattern_liberty_val(group.liberty_num)) << (4 * 2);
+		val.val32 |= (group.pattern_val ^ color_mask) << (4 * 2);
 	}
 
 	// 2’i–Ú
@@ -147,13 +147,13 @@ NonResponsePatternVal nonresponse_pattern(const Board& board, const XY xy, const
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | get_pattern_liberty_val(group.liberty_num)) << (4 * 3);
+		val.val32 |= (group.pattern_val ^ color_mask) << (4 * 3);
 	}
 	xyp += 2;
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | get_pattern_liberty_val(group.liberty_num)) << (4 * 4);
+		val.val32 |= (group.pattern_val ^ color_mask) << (4 * 4);
 	}
 
 	// 3’i–Ú
@@ -161,19 +161,19 @@ NonResponsePatternVal nonresponse_pattern(const Board& board, const XY xy, const
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | get_pattern_liberty_val(group.liberty_num)) << (4 * 5);
+		val.val32 |= (group.pattern_val ^ color_mask) << (4 * 5);
 	}
 	xyp++;
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | get_pattern_liberty_val(group.liberty_num)) << (4 * 6);
+		val.val32 |= (group.pattern_val ^ color_mask) << (4 * 6);
 	}
 	xyp++;
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val.val32 |= ((group.color ^ color_mask) | get_pattern_liberty_val(group.liberty_num)) << (4 * 7);
+		val.val32 |= (group.pattern_val ^ color_mask) << (4 * 7);
 	}
 
 	return get_min_pattern_key(val);

@@ -391,24 +391,19 @@ inline unsigned int get_pattern_liberty_val(const int liberty_num)
 	return (liberty_num >= 3) ? (3 << 2) : (liberty_num << 2);
 }
 
-inline uint64_t get_pattern_liberty_val64(const int liberty_num)
-{
-	return (liberty_num >= 3) ? (3ull << 2) : (liberty_num << 2);
-}
-
 inline PatternVal64 get_diamon12_pattern_val(const Board& board, const XY xy, const Color color)
 {
 	PatternVal64 val64 = 0;
 
 	// 黒を基準にする
-	const uint64_t color_mask = (color == BLACK) ? 0b00 : 0x11;
+	const uint64_t color_mask = (color == BLACK) ? 0b00 : 0b11;
 
 	// 1段目
 	XY xyp = xy - BOARD_WIDTH * 2;
 	if (xyp > BOARD_WIDTH && !board.is_empty(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val64 |= (uint64_t)((group.color ^ color_mask) | get_pattern_liberty_val64(group.liberty_num));
+		val64 |= (uint64_t)(group.pattern_val ^ color_mask);
 	}
 
 	// 2段目
@@ -416,19 +411,19 @@ inline PatternVal64 get_diamon12_pattern_val(const Board& board, const XY xy, co
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val64 |= (uint64_t)((group.color ^ color_mask) | get_pattern_liberty_val64(group.liberty_num)) << (4 * 1);
+		val64 |= (uint64_t)(group.pattern_val ^ color_mask) << (4 * 1);
 	}
 	xyp++;
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val64 |= (uint64_t)((group.color ^ color_mask) | get_pattern_liberty_val64(group.liberty_num)) << (4 * 2);
+		val64 |= (uint64_t)(group.pattern_val ^ color_mask) << (4 * 2);
 	}
 	xyp++;
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val64 |= (uint64_t)((group.color ^ color_mask) | get_pattern_liberty_val64(group.liberty_num)) << (4 * 3);
+		val64 |= (uint64_t)(group.pattern_val ^ color_mask) << (4 * 3);
 	}
 
 	// 3段目
@@ -436,25 +431,25 @@ inline PatternVal64 get_diamon12_pattern_val(const Board& board, const XY xy, co
 	if (board.is_stone(xyp) && !board.is_offboard(xyp + 1))
 	{
 		const Group& group = board.get_group(xyp);
-		val64 |= (uint64_t)((group.color ^ color_mask) | get_pattern_liberty_val64(group.liberty_num)) << (4 * 4);
+		val64 |= (uint64_t)(group.pattern_val ^ color_mask) << (4 * 4);
 	}
 	xyp++;
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val64 |= (uint64_t)((group.color ^ color_mask) | get_pattern_liberty_val64(group.liberty_num)) << (4 * 5);
+		val64 |= (uint64_t)(group.pattern_val ^ color_mask) << (4 * 5);
 	}
 	xyp += 2;
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val64 |= (uint64_t)((group.color ^ color_mask) | get_pattern_liberty_val64(group.liberty_num)) << (4 * 6);
+		val64 |= (uint64_t)(group.pattern_val ^ color_mask) << (4 * 6);
 	}
 	xyp++;
 	if (board.is_stone(xyp) && !board.is_offboard(xyp - 1))
 	{
 		const Group& group = board.get_group(xyp);
-		val64 |= (uint64_t)((group.color ^ color_mask) | get_pattern_liberty_val64(group.liberty_num)) << (4 * 7);
+		val64 |= (uint64_t)(group.pattern_val ^ color_mask) << (4 * 7);
 	}
 
 	// 4段目
@@ -462,19 +457,19 @@ inline PatternVal64 get_diamon12_pattern_val(const Board& board, const XY xy, co
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val64 |= (uint64_t)((group.color ^ color_mask) | get_pattern_liberty_val64(group.liberty_num)) << (4 * 8);
+		val64 |= (uint64_t)(group.pattern_val ^ color_mask) << (4 * 8);
 	}
 	xyp++;
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val64 |= (uint64_t)((group.color ^ color_mask) | get_pattern_liberty_val64(group.liberty_num)) << (4 * 9);
+		val64 |= (uint64_t)(group.pattern_val ^ color_mask) << (4 * 9);
 	}
 	xyp++;
 	if (board.is_stone(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val64 |= (uint64_t)((group.color ^ color_mask) | get_pattern_liberty_val64(group.liberty_num)) << (4 * 10);
+		val64 |= (uint64_t)(group.pattern_val ^ color_mask) << (4 * 10);
 	}
 
 	// 5段目
@@ -482,7 +477,7 @@ inline PatternVal64 get_diamon12_pattern_val(const Board& board, const XY xy, co
 	if (xyp < BOARD_MAX - BOARD_WIDTH && !board.is_empty(xyp))
 	{
 		const Group& group = board.get_group(xyp);
-		val64 |= (uint64_t)((group.color ^ color_mask) | get_pattern_liberty_val64(group.liberty_num)) << (4 * 11);
+		val64 |= (uint64_t)(group.pattern_val ^ color_mask) << (4 * 11);
 	}
 
 	return val64;

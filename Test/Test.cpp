@@ -677,11 +677,11 @@ int main()
 {
 	load_weight(L"../learn");
 
-	test_001();
-	test_002();
-	test_003();
-	test_004();
-	test_005();
+	//test_001();
+	//test_002();
+	//test_003();
+	//test_004();
+	//test_005();
 	//test_ladder_search_001();
 	//test_ladder_search_002();
 	//test_ladder_search_003();
@@ -694,9 +694,9 @@ int main()
 	//test_is_self_atari_003();
 	//test_is_self_atari_004();
 	//test_is_self_atari_005();
-	//test_pattern_001();
-	//test_pattern_002();
-	//test_pattern_003();
+	test_pattern_001();
+	test_pattern_002();
+	test_pattern_003();
 	//test_legal_001();
 	//test_save_atari_001();
 
