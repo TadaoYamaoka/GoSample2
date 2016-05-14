@@ -337,6 +337,78 @@ float get_weight_map_val(T& weightmap, const K& key, const int learned_position_
 	return get_weight_val(itr->second, learned_position_num);
 }
 
+bool is_delete(FILE* fp, const wchar_t* infile)
+{
+	char buf[10000];
+	// 1行目読み飛ばし
+	fgets(buf, sizeof(buf), fp);
+	// 2行目
+	fgets(buf, sizeof(buf), fp);
+
+	int len = strlen(buf);
+	if (buf[len - 2] == ')')
+	{
+		return true;
+	}
+
+	if (strsearch(buf, len, ")(", 2) != nullptr)
+	{
+		return true;
+	}
+
+	// ;で区切る
+	char* next = strtok(buf, ";");
+	int next_len = strlen(next);
+
+	// 指導碁除外
+	if (is_exclude(next))
+	{
+		return true;
+	}
+
+	// 置き碁除外
+	if (strsearch(next, next_len, "AB[", 3) != nullptr)
+	{
+		return true;
+	}
+
+	// 19路以外除外
+	if (strsearch(next, next_len, "SZ[19]", 6) == nullptr)
+	{
+		return true;
+	}
+
+	// 結果取得
+	Color win = get_win_from_re(next, infile);
+	if (win == 0)
+	{
+		return true;
+	}
+
+	// 最後まで打つ
+	Board board(19);
+	int turn = 0;
+	while ((next = strtok(NULL, ";")) != NULL)
+	{
+		Color color = get_color_from_sgf(next);
+		if (color == 0) {
+			continue;
+		}
+
+		XY xy = get_xy_from_sgf(next);
+		MoveResult result = board.move(xy, color, false);
+		if (result != SUCCESS)
+		{
+			fprintf(stderr, "%S, turn = %d, %s, move result error.\n", infile, turn, next);
+			return true;
+		}
+
+		turn++;
+	}
+
+	return false;
+}
+
 // 不要な棋譜を削除
 void clean_kifu(const wchar_t* dirs)
 {
@@ -368,61 +440,12 @@ void clean_kifu(const wchar_t* dirs)
 			}
 
 			wstring infile = finddir + L"\\" + win32fd.cFileName;
-			bool is_delete = false;
 
 			FILE* fp = _wfopen(infile.c_str(), L"r");
-			char buf[10000];
-			// 1行目読み飛ばし
-			fgets(buf, sizeof(buf), fp);
-			// 2行目
-			fgets(buf, sizeof(buf), fp);
-
-			int len = strlen(buf);
-			if (buf[len - 2] == ')')
-			{
-				is_delete = true;
-			}
-			else if (strsearch(buf, len, ")(", 2) != nullptr)
-			{
-				is_delete = true;
-			}
-			else
-			{
-
-				// ;で区切る
-				char* next = strtok(buf, ";");
-				int next_len = strlen(next);
-
-				// 指導碁除外
-				if (is_exclude(next))
-				{
-					is_delete = true;
-				}
-				// 置き碁除外
-				else if (strsearch(next, next_len, "AB[", 3) != nullptr)
-				{
-					is_delete = true;
-				}
-				// 19路以外除外
-				else if (strsearch(next, next_len, "SZ[19]", 6) == nullptr)
-				{
-					is_delete = true;
-				}
-				else
-				{
-
-					// 結果取得
-					Color win = get_win_from_re(next, infile.c_str());
-					if (win == 0)
-					{
-						is_delete = true;
-					}
-				}
-			}
-
+			bool isdelete = is_delete(fp, infile.c_str());
 			fclose(fp);
 
-			if (is_delete)
+			if (isdelete)
 			{
 				// ファイル削除
 				DeleteFile(infile.c_str());
