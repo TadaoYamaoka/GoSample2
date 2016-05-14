@@ -12,6 +12,7 @@ extern void print_nonresponse_pattern(const NonResponsePatternVal& val);
 extern void print_diamond12_pattern(const Diamond12PatternVal& val);
 extern void clean_kifu(const wchar_t* dirs);
 extern void init_weight();
+extern void print_pattern(const wchar_t* kind, const wchar_t* val);
 
 const int HASH_KEY_BIT = 24;
 const int HASH_KEY_MAX = 1 << HASH_KEY_BIT;

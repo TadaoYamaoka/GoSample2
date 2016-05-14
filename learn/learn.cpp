@@ -497,8 +497,7 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* er
 
 		XY xy = get_xy_from_sgf(next);
 
-		// 勝ったプレイヤー
-		if (color == win && turn >= 10 && xy != PASS)
+		if (turn >= 8 && xy != PASS)
 		{
 			float rollout_e_sum = 0;
 			float rollout_e_y = 0;
@@ -1374,13 +1373,8 @@ int prepare_pattern_sgf(const wchar_t* infile, map<ResponsePatternVal, int>& res
 		}
 
 		XY xy = get_xy_from_sgf(next);
-		if (xy == PASS)
-		{
-			continue;
-		}
 
-		// 勝ったプレイヤー
-		if (color == win && turn >= 10)
+		if (turn >= 8 && xy != PASS)
 		{
 			// 候補手一覧
 			for (XY txy = BOARD_WIDTH + 1; txy < BOARD_MAX - BOARD_WIDTH; txy++)
@@ -2095,4 +2089,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	}
 
 	return DefWindowProc(hWnd, uMsg, wParam, lParam);
+}
+
+void print_pattern(const wchar_t* kind, const wchar_t* valstr)
+{
+	if (wcscmp(kind, L"response") == 0)
+	{
+		long long val = _wtoi64(valstr);
+		print_response_pattern(val);
+	}
+	else if (wcscmp(kind, L"nonresponse") == 0)
+	{
+		int val = _wtoi(valstr);
+		print_nonresponse_pattern(val);
+	}
+	else if (wcscmp(kind, L"diamond12") == 0)
+	{
+		long long val = _wtoi64(valstr);
+		print_diamond12_pattern(val);
+	}
 }

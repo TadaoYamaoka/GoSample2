@@ -672,6 +672,35 @@ void test_save_atari_001()
 	assert(xy, get_xy(4, 5));
 }
 
+void test_uctpattern_001()
+{
+	// ”’(5,5)‚ÌŒã‚É(1,3)‚ğ‘Å‚Á‚½
+	Color test_board[] = {
+	//  1  2  3  4  5  6  7  8  9
+		0, 0, 0, 2, 2, 2, 2, 0, 2, // 1
+		0, 1, 2, 2, 2, 1, 1, 2, 0, // 2
+		0, 2, 1, 2, 1, 1, 0, 1, 0, // 3
+		0, 1, 1, 2, 1, 0, 0, 0, 0, // 4
+		0, 2, 2, 1, 0, 0, 1, 0, 0, // 5
+		2, 0, 2, 1, 0, 0, 0, 0, 0, // 6
+		0, 2, 1, 0, 1, 0, 0, 1, 0, // 7
+		0, 2, 1, 1, 0, 1, 0, 0, 0, // 8
+		0, 2, 2, 2, 1, 0, 0, 0, 0, // 9
+	};
+	Board board(9);
+	init_board(board, test_board, 9);
+
+	board.move(get_xy(5, 5), WHITE, false);
+
+	debug_print_board(board);
+
+	XY xy = player.select_move(board, BLACK);
+
+	print_child(player.root);
+	printf("xy = %d, x,y = %d,%d\n", xy, get_x(xy), get_y(xy));
+
+	assert(xy, get_xy(6, 5));
+}
 
 int main()
 {
@@ -694,11 +723,12 @@ int main()
 	//test_is_self_atari_003();
 	//test_is_self_atari_004();
 	//test_is_self_atari_005();
-	test_pattern_001();
-	test_pattern_002();
-	test_pattern_003();
+	//test_pattern_001();
+	//test_pattern_002();
+	//test_pattern_003();
 	//test_legal_001();
 	//test_save_atari_001();
+	test_uctpattern_001();
 
 	printf("Press any key.\n");
 	getchar();
