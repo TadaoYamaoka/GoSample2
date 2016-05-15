@@ -206,26 +206,21 @@ void compute_tree_policy(const Board& board, Color color, UCTNode* parent)
 			tree_weight_sum += tpw.neighbour_weight;
 		}
 		// アタリになる手か
-		if (!board.is_self_atari(color, node.xy))
+		if (board.is_self_atari(color, node.xy))
 		{
-			// ならない方を評価
 			tree_weight_sum += tpw.self_atari_weight;
 		}
 		// 直前2手からの距離
-		if (board.pre_xy[0] != PASS)
+		for (int move = 0; move < 2; move++)
 		{
-			const XY distance = get_distance(node.xy, board.pre_xy[0]);
-			if (distance < sizeof(tpw.last_move_distance_weight[0]) / sizeof(tpw.last_move_distance_weight[0][0]))
+			if (board.pre_xy[move] != PASS)
 			{
-				tree_weight_sum += tpw.last_move_distance_weight[0][distance];
-			}
-		}
-		if (board.pre_xy[1] != PASS)
-		{
-			const XY distance = get_distance(node.xy, board.pre_xy[1]);
-			if (distance < sizeof(tpw.last_move_distance_weight[1]) / sizeof(tpw.last_move_distance_weight[1][0]))
-			{
-				tree_weight_sum += tpw.last_move_distance_weight[1][distance];
+				XY distance = get_distance(node.xy, board.pre_xy[move]);
+				if (distance >= sizeof(tpw.last_move_distance_weight[0]) / sizeof(tpw.last_move_distance_weight[0][0]))
+				{
+					distance = sizeof(tpw.last_move_distance_weight[0]) / sizeof(tpw.last_move_distance_weight[0][0]) - 1;
+				}
+				tree_weight_sum += tpw.last_move_distance_weight[move][distance];
 			}
 		}
 		// 12-point diamondパターン

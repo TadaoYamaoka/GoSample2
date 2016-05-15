@@ -190,21 +190,21 @@ Color get_win_from_re(char* next, const wchar_t* infile)
 }
 
 // 教師データに一致する手の更新量
-inline float delta_weight_y(float y, float weight)
+inline float delta_weight_y(float y)
 {
-	return eta * (y - 1.0f) * weight;
+	return eta * (y - 1.0f);
 }
 
 // 教師データに一致しない手の更新量
-inline float delta_weight_y_etc(float y_etc, float weight)
+inline float delta_weight_y_etc(float y_etc)
 {
-	return eta * y_etc * weight;
+	return eta * y_etc;
 }
 
 // 教師データに一致する手の更新
 inline void update_weight_y(WeightLoss& weight_loss, const float y, map<WeightLoss*, float>& update_weight_map)
 {
-	update_weight_map[&weight_loss] -= delta_weight_y(y, weight_loss.weight);
+	update_weight_map[&weight_loss] -= delta_weight_y(y);
 }
 
 template <typename T, typename K>
@@ -222,7 +222,7 @@ void update_weight_map_y(T& weightmap, const K& key, const float y, map<WeightLo
 // 教師データに一致しない手の更新
 inline void update_weight_y_etc(WeightLoss& weight_loss, const float y_etc, map<WeightLoss*, float>& update_weight_map)
 {
-	update_weight_map[&weight_loss] -= delta_weight_y_etc(y_etc, weight_loss.weight);
+	update_weight_map[&weight_loss] -= delta_weight_y_etc(y_etc);
 }
 
 template <typename T, typename K>
@@ -549,27 +549,19 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* er
 					if (board.is_self_atari(color, txy))
 					{
 						is_self_atari_tmp = true;
-					}
-					else
-					{
-						// ならない方を評価
 						tree_weight_sum += get_weight_val(tpw_self_atari_weight, learned_position_num);
 					}
 					// 直前2手からの距離
-					if (board.pre_xy[0] != PASS)
+					for (int move = 0; move < 2; move++)
 					{
-						XY distance = get_distance(txy, board.pre_xy[0]);
-						if (distance < sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]))
+						if (board.pre_xy[move] != PASS)
 						{
-							tree_weight_sum += get_weight_val(tpw_last_move_distance_weight[0][distance], learned_position_num);
-						}
-					}
-					if (board.pre_xy[1] != PASS)
-					{
-						XY distance = get_distance(txy, board.pre_xy[1]);
-						if (distance < sizeof(tpw_last_move_distance_weight[1]) / sizeof(tpw_last_move_distance_weight[1][0]))
-						{
-							tree_weight_sum += get_weight_val(tpw_last_move_distance_weight[1][distance], learned_position_num);
+							XY distance = get_distance(txy, board.pre_xy[move]);
+							if (distance >= sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]))
+							{
+								distance = sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]) - 1;
+							}
+							tree_weight_sum += get_weight_val(tpw_last_move_distance_weight[move][distance], learned_position_num);
 						}
 					}
 					// 12-point diamondパターン
@@ -653,8 +645,8 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* er
 				// tree policy
 				update_weight_y(tpw_neighbour_weight, tree_y, update_weight_map);
 			}
-			// アタリになる手か(ならない方を評価)
-			if (!key_y.is_self_atari)
+			// アタリになる手か
+			if (key_y.is_self_atari)
 			{
 				// tree policy
 				update_weight_y(tpw_self_atari_weight, tree_y, update_weight_map);
@@ -670,10 +662,12 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* er
 						fprintf(errfile, "%S, turn = %d, %s, distance error.\n", infile, turn, next);
 						break;
 					}
-					if (distance < sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]))
+					if (distance >= sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]))
 					{
-						update_weight_y(tpw_last_move_distance_weight[move][distance], tree_y, update_weight_map);
+						distance = sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]) - 1;
 					}
+					update_weight_y(tpw_last_move_distance_weight[move][distance], tree_y, update_weight_map);
+					
 				}
 			}
 			// 12-point diamondパターン
@@ -723,8 +717,8 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* er
 					// tree policy
 					update_weight_y_etc(tpw_neighbour_weight, tree_y_etc, update_weight_map);
 				}
-				// アタリになる手か(ならない方を評価)
-				if (!keys[i].is_self_atari)
+				// アタリになる手か
+				if (keys[i].is_self_atari)
 				{
 					// tree policy
 					update_weight_y_etc(tpw_self_atari_weight, tree_y_etc, update_weight_map);
@@ -740,10 +734,11 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* er
 							fprintf(errfile, "%S, turn = %d, %s, distance error.\n", infile, turn, next);
 							break;
 						}
-						if (distance < sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]))
+						if (distance >= sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]))
 						{
-							update_weight_y_etc(tpw_last_move_distance_weight[move][distance], tree_y_etc, update_weight_map);
+							distance = sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]) - 1;
 						}
+						update_weight_y_etc(tpw_last_move_distance_weight[move][distance], tree_y_etc, update_weight_map);
 					}
 				}
 				// 12-point diamondパターン
@@ -804,8 +799,8 @@ void read_pattern(RolloutPolicyWeight& rpw, TreePolicyWeight& tpw)
 		ResponsePatternVal response;
 		fread(&response, sizeof(response), 1, fp);
 
-		rpw.response_pattern_weight.insert({ response, 1.0f });
-		tpw.response_pattern_weight.insert({ response, 1.0f });
+		rpw.response_pattern_weight.insert({ response, 0.0f });
+		tpw.response_pattern_weight.insert({ response, 0.0f });
 	}
 	fclose(fp);
 
@@ -820,8 +815,8 @@ void read_pattern(RolloutPolicyWeight& rpw, TreePolicyWeight& tpw)
 		NonResponsePatternVal nonresponse;
 		fread(&nonresponse, sizeof(nonresponse), 1, fp);
 
-		rpw.nonresponse_pattern_weight.insert({ nonresponse, 1.0f });
-		tpw.nonresponse_pattern_weight.insert({ nonresponse, 1.0f });
+		rpw.nonresponse_pattern_weight.insert({ nonresponse, 0.0f });
+		tpw.nonresponse_pattern_weight.insert({ nonresponse, 0.0f });
 	}
 	fclose(fp);
 
@@ -836,7 +831,7 @@ void read_pattern(RolloutPolicyWeight& rpw, TreePolicyWeight& tpw)
 		Diamond12PatternVal diamond12;
 		fread(&diamond12, sizeof(diamond12), 1, fp);
 
-		tpw.diamond12_pattern_weight.insert({ diamond12, 1.0f });
+		tpw.diamond12_pattern_weight.insert({ diamond12, 0.0f });
 	}
 	fclose(fp);
 }
@@ -902,19 +897,19 @@ void init_weight()
 	TreePolicyWeight tpw;
 
 	// 重み初期化
-	rpw.save_atari_weight = 1.0f;
-	rpw.neighbour_weight = 1.0f;
-	rpw.response_match_weight = 1.0f;
+	rpw.save_atari_weight = 0.0f;
+	rpw.neighbour_weight = 0.0f;
+	rpw.response_match_weight = 0.0f;
 
-	tpw.save_atari_weight = 1.0f;
-	tpw.neighbour_weight = 1.0f;
-	tpw.response_match_weight = 1.0f;
-	tpw.self_atari_weight = 1.0f;
+	tpw.save_atari_weight = 0.0f;
+	tpw.neighbour_weight = 0.0f;
+	tpw.response_match_weight = 0.0f;
+	tpw.self_atari_weight = 0.0f;
 	for (int move = 0; move < 2; move++)
 	{
 		for (int i = 0; i < sizeof(tpw.last_move_distance_weight[0]) / sizeof(tpw.last_move_distance_weight[0][0]); i++)
 		{
-			tpw.last_move_distance_weight[move][i] = 1.0f;
+			tpw.last_move_distance_weight[move][i] = 0.0f;
 		}
 	}
 
