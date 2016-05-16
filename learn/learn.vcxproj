@@ -23,6 +23,7 @@
     <ClCompile Include="Hash.cpp" />
     <ClCompile Include="learn.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="NakadeSearch.cpp" />
     <ClCompile Include="Pattern.cpp" />
   </ItemGroup>
   <ItemGroup>

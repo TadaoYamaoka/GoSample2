@@ -74,6 +74,15 @@ int wmain(int argc, wchar_t** argv)
 	{
 		sort_weight();
 	}
+	else if (wcscmp(argv[1], L"nakade_search") == 0)
+	{
+		if (argc < 3)
+		{
+			return 1;
+		}
+		extern void nakade_search(const wchar_t* dirs);
+		nakade_search(argv[2]);
+	}
 
 	return 0;
 }

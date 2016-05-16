@@ -206,7 +206,7 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 		remove_group(around_group_capture[i]);
 
 		// •ÏX‚µ‚½˜A‚É’Ç‰Á
-		pre_changed_group[pre_changed_group_num++] = around_group_capture[i];
+		pre_removed_group[pre_removed_group_num++] = around_group_capture[i];
 	}
 
 	// —×Ú‚·‚é“G‚Ì˜A‚É‚Â‚¢‚Ä
