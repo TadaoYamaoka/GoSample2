@@ -11,6 +11,7 @@ XY DIR4[4];
 MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 {
 	pre_changed_group_num = 0;
+	pre_removed_group_num = 0;
 
 	// パスの場合
 	if (xy == PASS) {
@@ -319,6 +320,9 @@ MoveResult Board::is_legal(const XY xy, const Color color, const bool fill_eye_e
 
 void Board::move_legal(const XY xy, const Color color)
 {
+	pre_changed_group_num = 0;
+	pre_removed_group_num = 0;
+
 	// パスの場合
 	if (xy == PASS) {
 		ko = -1;
