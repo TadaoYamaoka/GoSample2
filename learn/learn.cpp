@@ -2,6 +2,8 @@
 #include <string>
 #include <cassert>
 #include <vector>
+#include <chrono>
+#include <algorithm>
 
 #include "learn.h"
 #include "../Board.h"
@@ -36,6 +38,7 @@ float ramda = 0.00000001;
 struct WeightLoss
 {
 	float weight;
+	float g2;
 	int last_update_position;
 };
 
@@ -189,22 +192,22 @@ Color get_win_from_re(char* next, const wchar_t* infile)
 	return (win == 'B') ? BLACK : WHITE;
 }
 
-// 教師データに一致する手の更新量
-inline float delta_weight_y(float y)
+// 教師データに一致する手の勾配
+inline float grad_weight_y(float y)
 {
-	return eta * (y - 1.0f);
+	return (y - 1.0f);
 }
 
-// 教師データに一致しない手の更新量
-inline float delta_weight_y_etc(float y_etc)
+// 教師データに一致しない手の勾配
+inline float grad_weight_y_etc(float y_etc)
 {
-	return eta * y_etc;
+	return y_etc;
 }
 
 // 教師データに一致する手の更新
 inline void update_weight_y(WeightLoss& weight_loss, const float y, map<WeightLoss*, float>& update_weight_map)
 {
-	update_weight_map[&weight_loss] -= delta_weight_y(y);
+	update_weight_map[&weight_loss] += grad_weight_y(y);
 }
 
 template <typename T, typename K>
@@ -222,7 +225,7 @@ void update_weight_map_y(T& weightmap, const K& key, const float y, map<WeightLo
 // 教師データに一致しない手の更新
 inline void update_weight_y_etc(WeightLoss& weight_loss, const float y_etc, map<WeightLoss*, float>& update_weight_map)
 {
-	update_weight_map[&weight_loss] -= delta_weight_y_etc(y_etc);
+	update_weight_map[&weight_loss] += grad_weight_y_etc(y_etc);
 }
 
 template <typename T, typename K>
@@ -749,8 +752,10 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* er
 			for (auto itr : update_weight_map)
 			{
 				WeightLoss* update_weight_loss = itr.first;
-				//printf("weight = %f, delta = %f\n", update_weight_loss->weight, itr.second);
-				update_weight_loss->weight += itr.second;
+				float grad = itr.second;
+				// AdaGrad
+				update_weight_loss->g2 += grad * grad;
+				update_weight_loss->weight -= eta * grad / sqrtf(update_weight_loss->g2);
 			}
 			//printf("nonresponse0 = %f, %f, %llx\n", get_weight_map_val(rpw_nonresponse_pattern_weight, 0, learned_position_num), rpw_nonresponse_pattern_weight[0].weight, &rpw_nonresponse_pattern_weight[0]);
 
@@ -1061,9 +1066,15 @@ void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_
 
 	FILE* errfile = fopen("error.log", "w");
 
+	// 時間計測
+	auto start = chrono::system_clock::now();
+
 	// 棋譜を読み込んで学習
 	for (int i = 0; i < iteration_num; i++)
 	{
+		// シャッフル
+		random_shuffle(filelist_learn.begin(), filelist_learn.end());
+
 		for (wstring filepath : filelist_learn)
 		{
 			// パターン学習
@@ -1113,6 +1124,11 @@ void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_
 	{
 		penalty_pooled(itr.second, learned_position_num);
 	}
+
+	// 時間計測
+	auto end = chrono::system_clock::now();
+	auto elapse = end - start;
+	printf("elapsed time = %lld ms\n", chrono::duration_cast<std::chrono::milliseconds>(elapse).count());
 
 	// 学習結果表示
 	// rollout policy

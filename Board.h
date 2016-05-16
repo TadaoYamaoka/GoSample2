@@ -167,8 +167,10 @@ public:
 	int stone_num[3];
 
 	// ‘O‚Ìè‚Å•ÏX‚³‚ê‚½˜A
-	GroupIndex pre_changed_group[GROUP_SIZE_MAX];
+	GroupIndex pre_changed_group[GROUP_SIZE_MAX / 2];
 	int pre_changed_group_num;
+	GroupIndex pre_removed_group[GROUP_SIZE_MAX / 2];
+	int pre_removed_group_num;
 
 	Board() {}
 	Board(const int size) {

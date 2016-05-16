@@ -286,6 +286,17 @@ int UCTPattern::playout(Board& board, const Color color)
 			}
 		}
 
+		for (int i = 0; i < board.pre_removed_group_num; i++)
+		{
+			const Group& removed_group = board.groups[board.pre_removed_group[i]];
+			for (int j = 0; j < removed_group.stone_num; j++)
+			{
+				// 削除された位置を更新対象
+				const XY xy = removed_group.stone[j];
+				non_response_weight_board[xy] = 0;
+			}
+		}
+
 		// レスポンスパターンで共通となる12-point diamondパターンを計算
 		ResponsePatternVal response_base;
 		if (board.pre_xy[0] > PASS)
@@ -425,7 +436,7 @@ UCTNode* UCTPattern::select_node_with_ucb(const Board& board, const Color color,
 			ucb = FPU + float(random.random()) * FPU / RANDOM_MAX;
 			//printf("xy = %d, probability = %f\n", child->xy, child->probability);
 		}
-		else if (child->playout_num < THR) // 閾値以下の場合tree policyを使用
+		else if (child->xy != PASS && child->playout_num < THR) // 閾値以下の場合tree policyを使用
 		{
 			// PUCT
 			ucb = float(child->win_num) / child->playout_num + CPUCT * child->probability * sqrtf(logf(node->playout_num_sum)) / (1 + child->playout_num);
