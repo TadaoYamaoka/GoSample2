@@ -176,11 +176,6 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 					if (groups[board[xyd]].color == color)
 					{
 						groups[board[xyd]].add_liberty(xyr);
-						if (pre_changed_group[pre_changed_group_num - 1] != board[xyd])
-						{
-							// 変更した連に追加
-							pre_changed_group[pre_changed_group_num++] = board[xyd];
-						}
 					}
 				}
 			}
@@ -200,6 +195,9 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 				adjacent_group.adjacent.bit_test_and_reset(around_group_capture[i]);
 
 				remove.adjacent.bit_reset_for_bsf(j); // 削除する連なので更新してよい
+
+				// 変更した連に追加
+				pre_changed_group[pre_changed_group_num++] = idx;
 			}
 		}
 
@@ -459,11 +457,6 @@ void Board::move_legal(const XY xy, const Color color)
 					if (groups[board[xyd]].color == color)
 					{
 						groups[board[xyd]].add_liberty(xyr);
-						if (pre_changed_group[pre_changed_group_num - 1] != board[xyd])
-						{
-							// 変更した連に追加
-							pre_changed_group[pre_changed_group_num++] = board[xyd];
-						}
 					}
 				}
 			}
@@ -483,6 +476,9 @@ void Board::move_legal(const XY xy, const Color color)
 				adjacent_group.adjacent.bit_test_and_reset(around_group_capture[i]);
 
 				remove.adjacent.bit_reset_for_bsf(j); // 削除する連なので更新してよい
+
+				// 変更した連に追加
+				pre_changed_group[pre_changed_group_num++] = idx;
 			}
 		}
 
