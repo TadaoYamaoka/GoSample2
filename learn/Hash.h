@@ -56,7 +56,7 @@ struct RolloutPolicyWeightHash
 	float neighbour_weight;
 
 	// レスポンスマッチの重み
-	float response_match_weight;
+	//float response_match_weight;
 
 	// レスポンスパターンの重み
 	float response_pattern_weight[HASH_KEY_MAX];

@@ -94,7 +94,7 @@ void load_weight(const wchar_t* dirpath)
 	}
 	fread(&rpw.save_atari_weight, sizeof(rpw.save_atari_weight), 1, fp_weight);
 	fread(&rpw.neighbour_weight, sizeof(rpw.neighbour_weight), 1, fp_weight);
-	fread(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
+	//fread(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
 	int num;
 	fread(&num, sizeof(num), 1, fp_weight);
 	for (int i = 0; i < num; i++)
@@ -125,7 +125,7 @@ void load_weight(const wchar_t* dirpath)
 	}
 	fread(&tpw.save_atari_weight, sizeof(tpw.save_atari_weight), 1, fp_weight);
 	fread(&tpw.neighbour_weight, sizeof(tpw.neighbour_weight), 1, fp_weight);
-	fread(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
+	//fread(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
 	fread(&tpw.self_atari_weight, sizeof(tpw.self_atari_weight), 1, fp_weight);
 	fread(&tpw.last_move_distance_weight, sizeof(tpw.last_move_distance_weight), 1, fp_weight);
 	fread(&num, sizeof(num), 1, fp_weight);
@@ -192,7 +192,7 @@ void compute_tree_policy(const Board& board, Color color, UCTNode* parent)
 		float tree_weight_sum = tpw.nonresponse_pattern_weight[get_hash_key_nonresponse_pattern(nonresponse_val)];
 		if (response_val != 0)
 		{
-			tree_weight_sum += tpw.response_match_weight;
+			//tree_weight_sum += tpw.response_match_weight;
 			tree_weight_sum += tpw.response_pattern_weight[get_hash_key_response_pattern(response_val)];
 		}
 		// ƒAƒ^ƒŠ‚ð•‚¯‚éŽè‚©
@@ -319,7 +319,7 @@ int UCTPattern::playout(Board& board, const Color color)
 					const ResponsePatternVal response_val = response_pattern(board, xy, color_tmp, response_base);
 					if (response_val != 0)
 					{
-						weight_sum += rpw.response_match_weight;
+						//weight_sum += rpw.response_match_weight;
 						weight_sum += rpw.response_pattern_weight[get_hash_key_response_pattern(response_val)];
 
 						// ’¼‘O‚ÌŽè‚É—×Ú‚·‚éŽè‚©

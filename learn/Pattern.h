@@ -517,7 +517,7 @@ struct RolloutPolicyWeight
 	float neighbour_weight;
 
 	// レスポンスマッチの重み
-	float response_match_weight;
+	//float response_match_weight;
 
 	// レスポンスパターンの重み
 	std::map<ResponsePatternVal, float> response_pattern_weight;

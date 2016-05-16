@@ -42,14 +42,14 @@ struct WeightLoss
 // rollout policyの重み
 WeightLoss rpw_save_atari_weight;
 WeightLoss rpw_neighbour_weight;
-WeightLoss rpw_response_match_weight;
+//WeightLoss rpw_response_match_weight;
 map<ResponsePatternVal, WeightLoss> rpw_response_pattern_weight;
 map<NonResponsePatternVal, WeightLoss> rpw_nonresponse_pattern_weight;
 
 // tree policyの重み
 WeightLoss tpw_save_atari_weight;
 WeightLoss tpw_neighbour_weight;
-WeightLoss tpw_response_match_weight;
+//WeightLoss tpw_response_match_weight;
 map<ResponsePatternVal, WeightLoss> tpw_response_pattern_weight;
 map<NonResponsePatternVal, WeightLoss> tpw_nonresponse_pattern_weight;
 WeightLoss tpw_self_atari_weight;
@@ -505,7 +505,7 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* er
 					float rollout_weight_sum = get_weight_map_val(rpw_nonresponse_pattern_weight, nonresponse_val, learned_position_num);
 					if (response_val != 0)
 					{
-						rollout_weight_sum += get_weight_val(rpw_response_match_weight, learned_position_num);
+						//rollout_weight_sum += get_weight_val(rpw_response_match_weight, learned_position_num);
 						rollout_weight_sum += get_weight_map_val(rpw_response_pattern_weight, response_val, learned_position_num);
 					}
 					// アタリを助ける手か
@@ -530,7 +530,7 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* er
 					float tree_weight_sum = get_weight_map_val(tpw_nonresponse_pattern_weight, nonresponse_val, learned_position_num);
 					if (response_val != 0)
 					{
-						tree_weight_sum += get_weight_val(tpw_response_match_weight, learned_position_num);
+						//tree_weight_sum += get_weight_val(tpw_response_match_weight, learned_position_num);
 						tree_weight_sum += get_weight_map_val(tpw_response_pattern_weight, response_val, learned_position_num);
 					}
 					// アタリを助ける手か
@@ -623,10 +623,10 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* er
 			if (key_y.response_val != 0)
 			{
 				// rollout policy
-				update_weight_y(rpw_response_match_weight, rollout_y, update_weight_map);
+				//update_weight_y(rpw_response_match_weight, rollout_y, update_weight_map);
 				update_weight_map_y(rpw_response_pattern_weight, key_y.response_val, rollout_y, update_weight_map);
 				// tree policy
-				update_weight_y(tpw_response_match_weight, tree_y, update_weight_map);
+				//update_weight_y(tpw_response_match_weight, tree_y, update_weight_map);
 				update_weight_map_y(tpw_response_pattern_weight, key_y.response_val, tree_y, update_weight_map);
 			}
 			// アタリを助ける手か
@@ -695,10 +695,10 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* er
 				if (keys[i].response_val != 0)
 				{
 					// rollout policy
-					update_weight_y_etc(rpw_response_match_weight, rollout_y_etc, update_weight_map);
+					//update_weight_y_etc(rpw_response_match_weight, rollout_y_etc, update_weight_map);
 					update_weight_map_y_etc(rpw_response_pattern_weight, keys[i].response_val, rollout_y_etc, update_weight_map);
 					// tree policy
-					update_weight_y_etc(tpw_response_match_weight, tree_y_etc, update_weight_map);
+					//update_weight_y_etc(tpw_response_match_weight, tree_y_etc, update_weight_map);
 					update_weight_map_y_etc(tpw_response_pattern_weight, keys[i].response_val, tree_y_etc, update_weight_map);
 				}
 				// アタリを助ける手か
@@ -843,7 +843,7 @@ void write_weight(const RolloutPolicyWeight& rpw, const TreePolicyWeight& tpw)
 	FILE* fp_weight = fopen("rollout.bin", "wb");
 	fwrite(&rpw.save_atari_weight, sizeof(rpw.save_atari_weight), 1, fp_weight);
 	fwrite(&rpw.neighbour_weight, sizeof(rpw.neighbour_weight), 1, fp_weight);
-	fwrite(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
+	//fwrite(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
 	int num = rpw.response_pattern_weight.size();
 	fwrite(&num, sizeof(num), 1, fp_weight);
 	for (auto itr = rpw.response_pattern_weight.rbegin(); itr != rpw.response_pattern_weight.rend(); itr++)
@@ -864,7 +864,7 @@ void write_weight(const RolloutPolicyWeight& rpw, const TreePolicyWeight& tpw)
 	fp_weight = fopen("tree.bin", "wb");
 	fwrite(&tpw.save_atari_weight, sizeof(tpw.save_atari_weight), 1, fp_weight);
 	fwrite(&tpw.neighbour_weight, sizeof(tpw.neighbour_weight), 1, fp_weight);
-	fwrite(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
+	//fwrite(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
 	fwrite(&tpw.self_atari_weight, sizeof(tpw.self_atari_weight), 1, fp_weight);
 	fwrite(&tpw.last_move_distance_weight, sizeof(tpw.last_move_distance_weight), 1, fp_weight);
 	num = tpw.response_pattern_weight.size();
@@ -899,11 +899,11 @@ void init_weight()
 	// 重み初期化
 	rpw.save_atari_weight = 0.0f;
 	rpw.neighbour_weight = 0.0f;
-	rpw.response_match_weight = 0.0f;
+	//rpw.response_match_weight = 0.0f;
 
 	tpw.save_atari_weight = 0.0f;
 	tpw.neighbour_weight = 0.0f;
-	tpw.response_match_weight = 0.0f;
+	//tpw.response_match_weight = 0.0f;
 	tpw.self_atari_weight = 0.0f;
 	for (int move = 0; move < 2; move++)
 	{
@@ -941,7 +941,7 @@ void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_
 	FILE* fp_weight = fopen("rollout.bin", "rb");
 	fread(&rpw_save_atari_weight.weight, sizeof(rpw_save_atari_weight.weight), 1, fp_weight);
 	fread(&rpw_neighbour_weight.weight, sizeof(rpw_neighbour_weight.weight), 1, fp_weight);
-	fread(&rpw_response_match_weight.weight, sizeof(rpw_response_match_weight.weight), 1, fp_weight);
+	//fread(&rpw_response_match_weight.weight, sizeof(rpw_response_match_weight.weight), 1, fp_weight);
 	int num;
 	fread(&num, sizeof(num), 1, fp_weight);
 	for (int i = 0; i < num; i++)
@@ -967,7 +967,7 @@ void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_
 	fp_weight = fopen("tree.bin", "rb");
 	fread(&tpw_save_atari_weight.weight, sizeof(tpw_save_atari_weight.weight), 1, fp_weight);
 	fread(&tpw_neighbour_weight.weight, sizeof(tpw_neighbour_weight.weight), 1, fp_weight);
-	fread(&tpw_response_match_weight.weight, sizeof(tpw_response_match_weight.weight), 1, fp_weight);
+	//fread(&tpw_response_match_weight.weight, sizeof(tpw_response_match_weight.weight), 1, fp_weight);
 	fread(&tpw_self_atari_weight.weight, sizeof(tpw_self_atari_weight.weight), 1, fp_weight);
 	for (int move = 0; move < 2; move++)
 	{
@@ -1080,7 +1080,7 @@ void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_
 	// rollout policy
 	penalty_pooled(rpw_save_atari_weight, learned_position_num);
 	penalty_pooled(rpw_neighbour_weight, learned_position_num);
-	penalty_pooled(rpw_response_match_weight, learned_position_num);
+	//penalty_pooled(rpw_response_match_weight, learned_position_num);
 	for (auto itr : rpw_response_pattern_weight)
 	{
 		penalty_pooled(itr.second, learned_position_num);
@@ -1092,7 +1092,7 @@ void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_
 	// tree policy
 	penalty_pooled(tpw_save_atari_weight, learned_position_num);
 	penalty_pooled(tpw_neighbour_weight, learned_position_num);
-	penalty_pooled(tpw_response_match_weight, learned_position_num);
+	//penalty_pooled(tpw_response_match_weight, learned_position_num);
 	penalty_pooled(tpw_self_atari_weight, learned_position_num);
 	for (int move = 0; move < 2; move++)
 	{
@@ -1142,7 +1142,7 @@ void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_
 
 	printf("rollout policy save atari weight = %f\n", rpw_save_atari_weight.weight);
 	printf("rollout policy neighbour weight = %f\n", rpw_neighbour_weight.weight);
-	printf("rollout policy response match weight = %f\n", rpw_response_match_weight.weight);
+	//printf("rollout policy response match weight = %f\n", rpw_response_match_weight.weight);
 	// Top10
 	int n = 0;
 	for (auto itr = rpw_response_weight_sorted.rbegin(); itr != rpw_response_weight_sorted.rend() && n < 10; itr++, n++)
@@ -1191,7 +1191,7 @@ void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_
 
 	printf("tree policy save atari weight = %f\n", tpw_save_atari_weight.weight);
 	printf("tree policy neighbour weight = %f\n", tpw_neighbour_weight.weight);
-	printf("tree policy response match weight = %f\n", tpw_response_match_weight.weight);
+	//printf("tree policy response match weight = %f\n", tpw_response_match_weight.weight);
 	printf("tree policy self atari weight = %f\n", tpw_self_atari_weight.weight);
 	for (int move = 0; move < 2; move++)
 	{
@@ -1224,17 +1224,17 @@ void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_
 	fp_weight = fopen("rollout.bin", "wb");
 	fwrite(&rpw_save_atari_weight.weight, sizeof(rpw_save_atari_weight.weight), 1, fp_weight);
 	fwrite(&rpw_neighbour_weight.weight, sizeof(rpw_neighbour_weight.weight), 1, fp_weight);
-	fwrite(&rpw_response_match_weight.weight, sizeof(rpw_response_match_weight.weight), 1, fp_weight);
+	//fwrite(&rpw_response_match_weight.weight, sizeof(rpw_response_match_weight.weight), 1, fp_weight);
 	num = rpw_response_weight_sorted.size();
 	fwrite(&num, sizeof(num), 1, fp_weight);
-	for (auto itr = rpw_response_weight_sorted.rbegin(); itr != rpw_response_weight_sorted.rend(); itr++)
+	for (auto itr = rpw_response_weight_sorted.begin(); itr != rpw_response_weight_sorted.end(); itr++)
 	{
 		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
 		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
 	}
 	num = rpw_nonresponse_weight_sorted.size();
 	fwrite(&num, sizeof(num), 1, fp_weight);
-	for (auto itr = rpw_nonresponse_weight_sorted.rbegin(); itr != rpw_nonresponse_weight_sorted.rend(); itr++)
+	for (auto itr = rpw_nonresponse_weight_sorted.begin(); itr != rpw_nonresponse_weight_sorted.end(); itr++)
 	{
 		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
 		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
@@ -1245,7 +1245,7 @@ void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_
 	fp_weight = fopen("tree.bin", "wb");
 	fwrite(&tpw_save_atari_weight.weight, sizeof(tpw_save_atari_weight.weight), 1, fp_weight);
 	fwrite(&tpw_neighbour_weight.weight, sizeof(tpw_neighbour_weight.weight), 1, fp_weight);
-	fwrite(&tpw_response_match_weight.weight, sizeof(tpw_response_match_weight.weight), 1, fp_weight);
+	//fwrite(&tpw_response_match_weight.weight, sizeof(tpw_response_match_weight.weight), 1, fp_weight);
 	fwrite(&tpw_self_atari_weight.weight, sizeof(tpw_self_atari_weight.weight), 1, fp_weight);
 	for (int move = 0; move < 2; move++)
 	{
@@ -1256,21 +1256,21 @@ void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_
 	}
 	num = tpw_response_weight_sorted.size();
 	fwrite(&num, sizeof(num), 1, fp_weight);
-	for (auto itr = tpw_response_weight_sorted.rbegin(); itr != tpw_response_weight_sorted.rend(); itr++)
+	for (auto itr = tpw_response_weight_sorted.begin(); itr != tpw_response_weight_sorted.end(); itr++)
 	{
 		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
 		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
 	}
 	num = tpw_nonresponse_weight_sorted.size();
 	fwrite(&num, sizeof(num), 1, fp_weight);
-	for (auto itr = tpw_nonresponse_weight_sorted.rbegin(); itr != tpw_nonresponse_weight_sorted.rend(); itr++)
+	for (auto itr = tpw_nonresponse_weight_sorted.begin(); itr != tpw_nonresponse_weight_sorted.end(); itr++)
 	{
 		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
 		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
 	}
 	num = tpw_diamond12_weight_sorted.size();
 	fwrite(&num, sizeof(num), 1, fp_weight);
-	for (auto itr = tpw_diamond12_weight_sorted.rbegin(); itr != tpw_diamond12_weight_sorted.rend(); itr++)
+	for (auto itr = tpw_diamond12_weight_sorted.begin(); itr != tpw_diamond12_weight_sorted.end(); itr++)
 	{
 		fwrite(&itr->second, sizeof(itr->second), 1, fp_weight);
 		fwrite(&itr->first, sizeof(itr->first), 1, fp_weight);
@@ -1791,7 +1791,7 @@ void dump_weight()
 	}
 	fread(&rpw.save_atari_weight, sizeof(rpw.save_atari_weight), 1, fp_weight);
 	fread(&rpw.neighbour_weight, sizeof(rpw.neighbour_weight), 1, fp_weight);
-	fread(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
+	//fread(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
 	int num;
 	fread(&num, sizeof(num), 1, fp_weight);
 	for (int i = 0; i < num; i++)
@@ -1819,7 +1819,7 @@ void dump_weight()
 
 	printf("rollout save atari weight = %f\n", rpw.save_atari_weight);
 	printf("rollout neighbour_weight = %f\n", rpw.neighbour_weight);
-	printf("rollout response match weight = %f\n", rpw.response_match_weight);
+	//printf("rollout response match weight = %f\n", rpw.response_match_weight);
 
 	// Top10
 	printf("Top10\n");
@@ -1875,7 +1875,7 @@ void dump_weight()
 	}
 	fread(&tpw.save_atari_weight, sizeof(tpw.save_atari_weight), 1, fp_weight);
 	fread(&tpw.neighbour_weight, sizeof(tpw.neighbour_weight), 1, fp_weight);
-	fread(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
+	//fread(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
 	fread(&tpw.self_atari_weight, sizeof(tpw.self_atari_weight), 1, fp_weight);
 	fread(&tpw.last_move_distance_weight, sizeof(tpw.last_move_distance_weight), 1, fp_weight);
 	fread(&num, sizeof(num), 1, fp_weight);
@@ -1914,7 +1914,7 @@ void dump_weight()
 
 	printf("tree save atari weight = %f\n", tpw.save_atari_weight);
 	printf("tree neighbour_weight = %f\n", tpw.neighbour_weight);
-	printf("tree response match weight = %f\n", tpw.response_match_weight);
+	//printf("tree response match weight = %f\n", tpw.response_match_weight);
 	printf("tree policy self atari weight = %f\n", tpw.self_atari_weight);
 	for (int move = 0; move < 2; move++)
 	{
@@ -2014,7 +2014,7 @@ void sort_weight()
 	}
 	fread(&rpw.save_atari_weight, sizeof(rpw.save_atari_weight), 1, fp_weight);
 	fread(&rpw.neighbour_weight, sizeof(rpw.neighbour_weight), 1, fp_weight);
-	fread(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
+	//fread(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
 	int num;
 	fread(&num, sizeof(num), 1, fp_weight);
 	for (int i = 0; i < num; i++)
@@ -2044,7 +2044,7 @@ void sort_weight()
 	}
 	fread(&tpw.save_atari_weight, sizeof(tpw.save_atari_weight), 1, fp_weight);
 	fread(&tpw.neighbour_weight, sizeof(tpw.neighbour_weight), 1, fp_weight);
-	fread(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
+	//fread(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
 	fread(&tpw.self_atari_weight, sizeof(tpw.self_atari_weight), 1, fp_weight);
 	fread(&tpw.last_move_distance_weight, sizeof(tpw.last_move_distance_weight), 1, fp_weight);
 	fread(&num, sizeof(num), 1, fp_weight);
@@ -2081,7 +2081,7 @@ void sort_weight()
 	fp_weight = fopen("rollout.bin", "wb");
 	fwrite(&rpw.save_atari_weight, sizeof(rpw.save_atari_weight), 1, fp_weight);
 	fwrite(&rpw.neighbour_weight, sizeof(rpw.neighbour_weight), 1, fp_weight);
-	fwrite(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
+	//fwrite(&rpw.response_match_weight, sizeof(rpw.response_match_weight), 1, fp_weight);
 	num = rpw_response_weight_sorted.size();
 	fwrite(&num, sizeof(num), 1, fp_weight);
 	for (auto itr = rpw_response_weight_sorted.begin(); itr != rpw_response_weight_sorted.end(); itr++)
@@ -2102,7 +2102,7 @@ void sort_weight()
 	fp_weight = fopen("tree.bin", "wb");
 	fwrite(&tpw.save_atari_weight, sizeof(tpw.save_atari_weight), 1, fp_weight);
 	fwrite(&tpw.neighbour_weight, sizeof(tpw.neighbour_weight), 1, fp_weight);
-	fwrite(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
+	//fwrite(&tpw.response_match_weight, sizeof(tpw.response_match_weight), 1, fp_weight);
 	fwrite(&tpw.self_atari_weight, sizeof(tpw.self_atari_weight), 1, fp_weight);
 	for (int move = 0; move < 2; move++)
 	{
