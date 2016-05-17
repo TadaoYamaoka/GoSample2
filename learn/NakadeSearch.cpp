@@ -74,17 +74,25 @@ void nakade_search_sgf(const wchar_t* infile, int &learned_position_num)
 	Board board(19);
 
 	int turn = 0;
+	XY nakade_xy = -1;
+	int nakade_liberty_num;
 	while ((next = strtok(NULL, ";")) != NULL)
 	{
-		Color color = get_color_from_sgf(next);
+		turn++;
+
+		const Color color = get_color_from_sgf(next);
 		if (color == 0) {
 			continue;
 		}
 
-		XY xy = get_xy_from_sgf(next);
+		const XY xy = get_xy_from_sgf(next);
 
-		turn++;
-		MoveResult result = board.move(xy, color, false);
+		if (nakade_xy == xy)
+		{
+			printf("%S, turn = %d, (x, y) = (%d, %d), liberty_num = %d, nakade\n", infile, turn, get_x(xy), get_y(xy), nakade_liberty_num);
+		}
+
+		const MoveResult result = board.move(xy, color, false);
 		if (result != SUCCESS)
 		{
 			fprintf(stderr, "%S, turn = %d, %s, move result error.\n", infile, turn, next);
@@ -130,6 +138,10 @@ void nakade_search_sgf(const wchar_t* infile, int &learned_position_num)
 							continue;
 						}
 					}
+					else if (!board.is_offboard(xy1) && board[xy1] != group.color)
+					{
+						continue;
+					}
 					// ¶•ûŒü
 					xy1 = xy0 - 1;
 					if (board.is_empty(xy1))
@@ -150,6 +162,10 @@ void nakade_search_sgf(const wchar_t* infile, int &learned_position_num)
 						{
 							continue;
 						}
+					}
+					else if (!board.is_offboard(xy1) && board[xy1] != group.color)
+					{
+						continue;
 					}
 					// ‰E•ûŒü
 					xy1 = xy0 + 1;
@@ -172,6 +188,10 @@ void nakade_search_sgf(const wchar_t* infile, int &learned_position_num)
 							continue;
 						}
 					}
+					else if (!board.is_offboard(xy1) && board[xy1] != group.color)
+					{
+						continue;
+					}
 					// ‰º•ûŒü
 					xy1 = xy0 + BOARD_WIDTH;
 					if (board.is_empty(xy1))
@@ -193,10 +213,20 @@ void nakade_search_sgf(const wchar_t* infile, int &learned_position_num)
 							continue;
 						}
 					}
+					else if (!board.is_offboard(xy1) && board[xy1] != group.color)
+					{
+						continue;
+					}
 
 					if (liberty_num >= 3)
 					{
-						printf("%S, turn = %d, (x, y) = (%d, %d), liberty_num = %d\n", infile, turn, get_x(xy0), get_y(xy0), liberty_num);
+						//printf("%S, turn = %d, (x, y) = (%d, %d), liberty_num = %d\n", infile, turn, get_x(xy0), get_y(xy0), liberty_num);
+						nakade_xy = xy0;
+						nakade_liberty_num = liberty_num;
+					}
+					else
+					{
+						nakade_xy = -1;
 					}
 				}
 			}

@@ -749,7 +749,7 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* er
 			}
 
 			// èdÇ›çXêV
-			for (auto itr : update_weight_map)
+			for (const auto itr : update_weight_map)
 			{
 				WeightLoss* update_weight_loss = itr.first;
 				float grad = itr.second;
@@ -766,7 +766,7 @@ int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* er
 			tpw_nonresponse_pattern_weight[0].last_update_position = learned_position_num;
 		}
 
-		MoveResult result = board.move(xy, color, false);
+		const MoveResult result = board.move(xy, color, false);
 		if (result != SUCCESS)
 		{
 			fprintf(errfile, "%S, turn = %d, %s, move result error.\n", infile, turn, next);
