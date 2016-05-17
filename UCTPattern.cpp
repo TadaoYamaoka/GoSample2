@@ -166,7 +166,7 @@ void compute_tree_policy(const Board& board, Color color, UCTNode* parent)
 	ResponsePatternVal response_base;
 	if (board.pre_xy[0] > PASS)
 	{
-		response_base = get_diamon12_pattern_val(board, board.pre_xy[0], color);
+		response_base = get_diamond12_pattern_val(board, board.pre_xy[0], color);
 	}
 
 	for (int i = 0; i < parent->child_num; i++)
@@ -301,7 +301,7 @@ int UCTPattern::playout(Board& board, const Color color)
 		ResponsePatternVal response_base;
 		if (board.pre_xy[0] > PASS)
 		{
-			response_base = get_diamon12_pattern_val(board, board.pre_xy[0], color_tmp);
+			response_base = get_diamond12_pattern_val(board, board.pre_xy[0], color_tmp);
 		}
 
 		// 候補手一覧(合法手チェックなし)

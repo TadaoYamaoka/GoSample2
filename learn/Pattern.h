@@ -390,7 +390,7 @@ inline unsigned int get_pattern_liberty_val(const int liberty_num)
 	return (liberty_num >= 3) ? (3 << 2) : (liberty_num << 2);
 }
 
-inline PatternVal64 get_diamon12_pattern_val(const Board& board, const XY xy, const Color color)
+inline PatternVal64 get_diamond12_pattern_val(const Board& board, const XY xy, const Color color)
 {
 	PatternVal64 val64 = 0;
 
@@ -490,7 +490,7 @@ extern Diamond12PatternVal diamond12_pattern_min(const Board& board, const XY xy
 
 inline Diamond12PatternVal diamond12_pattern(const Board& board, const XY xy, const Color color)
 {
-	return get_diamon12_pattern_val(board, xy, color);
+	return get_diamond12_pattern_val(board, xy, color);
 }
 
 inline XY get_distance(const XY xy1, const XY xy2)

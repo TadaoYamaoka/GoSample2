@@ -799,10 +799,14 @@ void read_pattern(RolloutPolicyWeight& rpw, TreePolicyWeight& tpw)
 		fprintf(stderr, "response.ptn read error\n");
 		return;
 	}
-	while (feof(fp) == 0)
+	while (true)
 	{
 		ResponsePatternVal response;
-		fread(&response, sizeof(response), 1, fp);
+		size_t size = fread(&response, sizeof(response), 1, fp);
+		if (size == 0)
+		{
+			break;
+		}
 
 		rpw.response_pattern_weight.insert({ response, 0.0f });
 		tpw.response_pattern_weight.insert({ response, 0.0f });
@@ -815,10 +819,14 @@ void read_pattern(RolloutPolicyWeight& rpw, TreePolicyWeight& tpw)
 		fprintf(stderr, "nonresponse.ptn read error\n");
 		return;
 	}
-	while (feof(fp) == 0)
+	while (true)
 	{
 		NonResponsePatternVal nonresponse;
-		fread(&nonresponse, sizeof(nonresponse), 1, fp);
+		size_t size = fread(&nonresponse, sizeof(nonresponse), 1, fp);
+		if (size == 0)
+		{
+			break;
+		}
 
 		rpw.nonresponse_pattern_weight.insert({ nonresponse, 0.0f });
 		tpw.nonresponse_pattern_weight.insert({ nonresponse, 0.0f });
@@ -831,10 +839,14 @@ void read_pattern(RolloutPolicyWeight& rpw, TreePolicyWeight& tpw)
 		fprintf(stderr, "diamond12.ptn read error\n");
 		return;
 	}
-	while (feof(fp) == 0)
+	while (true)
 	{
 		Diamond12PatternVal diamond12;
-		fread(&diamond12, sizeof(diamond12), 1, fp);
+		size_t size = fread(&diamond12, sizeof(diamond12), 1, fp);
+		if (size == 0)
+		{
+			break;
+		}
 
 		tpw.diamond12_pattern_weight.insert({ diamond12, 0.0f });
 	}
@@ -1617,10 +1629,14 @@ void check_hash()
 		fprintf(stderr, "response.ptn read error\n");
 		return;
 	}
-	while (feof(fp) == 0)
+	while (true)
 	{
 		ResponsePatternVal response;
-		fread(&response, sizeof(response), 1, fp);
+		size_t size = fread(&response, sizeof(response), 1, fp);
+		if (size == 0)
+		{
+			break;
+		}
 
 		// è’ìÀåüèo
 		collision_num += insert_pattern_hash_collision(response_pattern_collision, response);
@@ -1635,10 +1651,14 @@ void check_hash()
 		fprintf(stderr, "nonresponse.ptn read error\n");
 		return;
 	}
-	while (feof(fp) == 0)
+	while (true)
 	{
 		NonResponsePatternVal nonresponse;
-		fread(&nonresponse, sizeof(nonresponse), 1, fp);
+		size_t size = fread(&nonresponse, sizeof(nonresponse), 1, fp);
+		if (size == 0)
+		{
+			break;
+		}
 
 		// è’ìÀåüèo
 		collision_num += insert_pattern_hash_collision(nonresponse_pattern_collision, nonresponse);
@@ -1653,10 +1673,14 @@ void check_hash()
 		fprintf(stderr, "diamond12.ptn read error\n");
 		return;
 	}
-	while (feof(fp) == 0)
+	while (true)
 	{
 		Diamond12PatternVal diamond12;
-		fread(&diamond12, sizeof(diamond12), 1, fp);
+		size_t size = fread(&diamond12, sizeof(diamond12), 1, fp);
+		if (size == 0)
+		{
+			break;
+		}
 
 		// è’ìÀåüèo
 		collision_num += insert_pattern_hash_collision(diamond12_pattern_collision, diamond12);
