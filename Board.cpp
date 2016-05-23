@@ -214,14 +214,17 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 		// 呼吸点の削除
 		groups[around_group_oponnent[i]].remove_liberty(xy);
 
+		// 変更した連に追加
+		if (groups[around_group_oponnent[i]].liberty_num < 3)
+		{
+			pre_changed_group[pre_changed_group_num++] = around_group_oponnent[i];
+		}
+
 		// 隣接する敵の連番号を追加
 		groups[board[xy]].adjacent.bit_test_and_set(around_group_oponnent[i]);
 
 		// 敵の連にも自分を隣接する連として追加
 		groups[around_group_oponnent[i]].adjacent.bit_test_and_set(board[xy]);
-
-		// 変更した連に追加
-		pre_changed_group[pre_changed_group_num++] = around_group_oponnent[i];
 	}
 
 	// パターン値更新
@@ -495,14 +498,17 @@ void Board::move_legal(const XY xy, const Color color)
 		// 呼吸点の削除
 		groups[around_group_oponnent[i]].remove_liberty(xy);
 
+		// 変更した連に追加
+		if (groups[around_group_oponnent[i]].liberty_num < 3)
+		{
+			pre_changed_group[pre_changed_group_num++] = around_group_oponnent[i];
+		}
+
 		// 隣接する敵の連番号を追加
 		groups[board[xy]].adjacent.bit_test_and_set(around_group_oponnent[i]);
 
 		// 敵の連にも自分を隣接する連として追加
 		groups[around_group_oponnent[i]].adjacent.bit_test_and_set(board[xy]);
-
-		// 変更した連に追加
-		pre_changed_group[pre_changed_group_num++] = around_group_oponnent[i];
 	}
 
 	// パターン値更新
