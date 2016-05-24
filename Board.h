@@ -158,7 +158,7 @@ public:
 	GroupIndex board[BOARD_BYTE_MAX];
 
 	// ˜A
-	FixedList<Group, GROUP_SIZE_MAX> groups;
+	FixedList<Group, GroupIndex, GROUP_SIZE_MAX> groups;
 
 	XY ko;
 	XY pre_xy[2];

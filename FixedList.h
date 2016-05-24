@@ -2,23 +2,23 @@
 
 #include "BitBoard.h"
 
-template <typename T, const size_t size>
+template <typename T, typename I, const size_t size>
 class FixedList
 {
 public:
-	enum { END = 255 };
+	enum { END = (I)-1 };
 
 	struct Elem {
 		T val;
-		unsigned char next;
-		unsigned char prev;
+		I next;
+		I prev;
 	};
 
 private:
 	Elem list[size];
 	BitBoard<size> unusedflg;
-	unsigned char first;
-	unsigned char last;
+	I first;
+	I last;
 
 public:
 	void init() {
@@ -31,21 +31,21 @@ public:
 		unusedflg.set_bitboard_part(unusedflg.get_part_size() - 1, (1ll << (size % BIT)) - 1);
 	}
 
-	unsigned char begin() const {
+	I begin() const {
 		return first;
 	}
 
-	unsigned char next(const unsigned char idx) const {
+	I next(const I idx) const {
 		return list[idx].next;
 	}
 
-	unsigned char end() const {
+	I end() const {
 		return END;
 	}
 
-	unsigned char add() {
+	I add() {
 		// 未使用のインデックスを探す
-		unsigned char idx = unusedflg.get_first_pos();
+		I idx = unusedflg.get_first_pos();
 
 		// 使用中にする
 		unusedflg.bit_test_and_reset(idx);
@@ -66,13 +66,13 @@ public:
 		return last;
 	}
 
-	void remove(const unsigned char idx) {
+	void remove(const I idx) {
 		// インデックスを未使用にする
 		unusedflg.bit_test_and_set(idx);
 
 		// リンクリスト解除
-		unsigned char next = list[idx].next;
-		unsigned char prev = list[idx].prev;
+		I next = list[idx].next;
+		I prev = list[idx].prev;
 		if (idx == first)
 		{
 			first = next;
@@ -90,11 +90,11 @@ public:
 		}
 	}
 
-	T& operator[] (const unsigned char idx) {
+	T& operator[] (const I idx) {
 		return list[idx].val;
 	}
 
-	const T& operator[] (const unsigned char idx) const {
+	const T& operator[] (const I idx) const {
 		return list[idx].val;
 	}
 };
