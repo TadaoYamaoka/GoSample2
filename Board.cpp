@@ -119,6 +119,9 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 
 		// 変更した連に追加
 		pre_changed_group[pre_changed_group_num++] = idx;
+
+		// 空白削除
+		empty_list.remove(xy);
 	}
 	else
 	{
@@ -134,6 +137,9 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 
 		// 変更した連に追加
 		pre_changed_group[pre_changed_group_num++] = around_group_self[0];
+
+		// 空白削除
+		empty_list.remove(xy);
 
 		for (int i = 1; i < around_group_self_num; i++)
 		{
@@ -166,6 +172,9 @@ MoveResult Board::move(const XY xy, const Color color, const bool fill_eye_err)
 			// 連のあった位置を空白にする
 			XY xyr = remove.stone[j];
 			board[xyr] = G_NONE;
+
+			// 空白追加
+			empty_list.add(xyr);
 
 			// 隣接する石に呼吸点を追加
 			for (XY d : DIR4)
@@ -403,6 +412,9 @@ void Board::move_legal(const XY xy, const Color color)
 
 		// 変更した連に追加
 		pre_changed_group[pre_changed_group_num++] = idx;
+
+		// 空白削除
+		empty_list.remove(xy);
 	}
 	else
 	{
@@ -418,6 +430,9 @@ void Board::move_legal(const XY xy, const Color color)
 
 		// 変更した連に追加
 		pre_changed_group[pre_changed_group_num++] = around_group_self[0];
+
+		// 空白削除
+		empty_list.remove(xy);
 
 		for (int i = 1; i < around_group_self_num; i++)
 		{
@@ -450,6 +465,9 @@ void Board::move_legal(const XY xy, const Color color)
 			// 連のあった位置を空白にする
 			XY xyr = remove.stone[j];
 			board[xyr] = G_NONE;
+
+			// 空白追加
+			empty_list.add(xyr);
 
 			// 隣接する石に呼吸点を追加
 			for (XY d : DIR4)

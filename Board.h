@@ -4,6 +4,7 @@
 #include <memory.h>
 #include "BitBoard.h"
 #include "FixedList.h"
+#include "FixedIndexList.h"
 
 extern int BOARD_SIZE;
 extern int BOARD_WIDTH;
@@ -172,6 +173,9 @@ public:
 	GroupIndex pre_removed_group[GROUP_SIZE_MAX / 2];
 	int pre_removed_group_num;
 
+	// 空白のリスト
+	FixedIndexList<XY, (BOARD_SIZE_MAX + 1) * (BOARD_SIZE_MAX + 1)> empty_list;
+
 	Board() {}
 	Board(const int size) {
 		init(size);
@@ -199,6 +203,18 @@ public:
 		DIR4[3] = BOARD_WIDTH;
 		ko = -1;
 		pre_xy[0] = pre_xy[1] = -1;
+		// 空白のリスト初期化
+		for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
+		{
+			for (XY x = 1; x <= BOARD_SIZE; x++)
+			{
+				const XY xy = y + x;
+				if (is_empty(xy))
+				{
+					empty_list.add(xy);
+				}
+			}
+		}
 	}
 
 	const Color operator[](const XY xy) const {

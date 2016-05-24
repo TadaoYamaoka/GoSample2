@@ -306,55 +306,48 @@ int UCTPattern::playout(Board& board, const Color color)
 
 		// 候補手一覧(合法手チェックなし)
 		int possibles_num = 0;
-		for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
+		for (XY xy = board.empty_list.begin(); xy != board.empty_list.end(); xy = board.empty_list.next(xy))
 		{
-			for (XY x = 1; x <= BOARD_SIZE; x++)
+			float weight_sum;
+			// 確率算出
+
+			// 重みの線形和
+			// Non-response pattern
+			// 初回もしくは直前に変更のあった連の周辺のみ更新する
+			if (non_response_weight_board[xy] == 0)
 			{
-				const XY xy = y + x;
-				if (board.is_empty(xy))
+				const NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, xy, color_tmp);
+				non_response_weight_board[xy] = rpw.nonresponse_pattern_weight[get_hash_key_nonresponse_pattern(nonresponse_val)];
+			}
+			weight_sum = non_response_weight_board[xy];
+
+			// Response pattern
+			const ResponsePatternVal response_val = response_pattern(board, xy, color_tmp, response_base);
+			if (response_val != 0)
+			{
+				//weight_sum += rpw.response_match_weight;
+				weight_sum += rpw.response_pattern_weight[get_hash_key_response_pattern(response_val)];
+
+				// 直前の手に隣接する手か
+				if (is_neighbour(board, xy))
 				{
-					float weight_sum;
-					// 確率算出
-
-					// 重みの線形和
-					// Non-response pattern
-					// 初回もしくは直前に変更のあった連の周辺のみ更新する
-					if (non_response_weight_board[xy] == 0)
-					{
-						const NonResponsePatternVal nonresponse_val = nonresponse_pattern(board, xy, color_tmp);
-						non_response_weight_board[xy] = rpw.nonresponse_pattern_weight[get_hash_key_nonresponse_pattern(nonresponse_val)];
-					}
-					weight_sum = non_response_weight_board[xy];
-
-					// Response pattern
-					const ResponsePatternVal response_val = response_pattern(board, xy, color_tmp, response_base);
-					if (response_val != 0)
-					{
-						//weight_sum += rpw.response_match_weight;
-						weight_sum += rpw.response_pattern_weight[get_hash_key_response_pattern(response_val)];
-
-						// 直前の手に隣接する手か
-						if (is_neighbour(board, xy))
-						{
-							weight_sum += rpw.neighbour_weight;
-						}
-					}
-					// アタリを助ける手か
-					if (atari_save.bit_test(xy))
-					{
-						weight_sum += rpw.save_atari_weight;
-					}
-
-					// 各手のsoftmaxを計算
-					const int e_weight = expf(weight_sum) * 1000; // 1000倍して整数にする
-					e_weight_sum += e_weight;
-
-					possibles[possibles_num].xy = xy;
-					possibles[possibles_num].e_weight = e_weight;
-
-					possibles_num++;
+					weight_sum += rpw.neighbour_weight;
 				}
 			}
+			// アタリを助ける手か
+			if (atari_save.bit_test(xy))
+			{
+				weight_sum += rpw.save_atari_weight;
+			}
+
+			// 各手のsoftmaxを計算
+			const int e_weight = expf(weight_sum) * 1000; // 1000倍して整数にする
+			e_weight_sum += e_weight;
+
+			possibles[possibles_num].xy = xy;
+			possibles[possibles_num].e_weight = e_weight;
+
+			possibles_num++;
 		}
 
 		while (true)

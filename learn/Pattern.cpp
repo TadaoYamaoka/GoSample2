@@ -3,13 +3,13 @@
 #include "Pattern.h"
 
 // パターン値取得(回転、対称形の最小値)
-template <typename T>
-T get_min_pattern_key(const T& val)
+template <typename I>
+I get_min_pattern_key(const I& val)
 {
-	T min = val;
+	I min = val;
 
 	// 90度回転
-	T rot = val.rotate();
+	I rot = val.rotate();
 	if (rot < min)
 	{
 		min = rot;

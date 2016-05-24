@@ -54,21 +54,14 @@ bool UCTNode::expand_node(const Board& board)
 
 	// ƒm[ƒh‚Ì’l‚ğİ’è
 	int i = 0;
-	for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
+	for (XY xy = board.empty_list.begin(); xy != board.empty_list.end(); xy = board.empty_list.next(xy))
 	{
-		for (XY x = 1; x <= BOARD_SIZE; x++)
-		{
-			XY xy = y + x;
-			if (board.is_empty(xy))
-			{
-				child[i].xy = xy;
-				child[i].playout_num = 0;
-				child[i].playout_num_sum = 0;
-				child[i].win_num = 0;
-				child[i].child_num = 0;
-				i++;
-			}
-		}
+		child[i].xy = xy;
+		child[i].playout_num = 0;
+		child[i].playout_num_sum = 0;
+		child[i].win_num = 0;
+		child[i].child_num = 0;
+		i++;
 	}
 	// PASS‚ğ’Ç‰Á
 	child[i].xy = PASS;

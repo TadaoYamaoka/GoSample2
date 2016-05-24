@@ -9,6 +9,7 @@
 #include "../UCTParallel.h"
 #include "../UCTSaveAtari.h"
 #include "../UCTPattern.h";
+#include "../FixedIndexList.h"
 
 using namespace std;
 
@@ -702,15 +703,63 @@ void test_uctpattern_001()
 	assert(xy, get_xy(6, 5));
 }
 
+void print_fixedindexlist(FixedIndexList<XY, BOARD_BYTE_MAX>& empty_list)
+{
+	for (XY xy = empty_list.begin(); xy != empty_list.end(); xy = empty_list.next(xy))
+	{
+		printf("%d ", xy);
+	}
+	printf("\n");
+}
+
+void test_fixedindexlist()
+{
+	Board board(9);
+
+	FixedIndexList<XY, BOARD_BYTE_MAX> empty_list;
+
+	for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
+	{
+		for (XY x = 1; x <= BOARD_SIZE; x++)
+		{
+			const XY xy = y + x;
+			if (board.is_empty(xy))
+			{
+				empty_list.add(xy);
+			}
+		}
+	}
+
+	print_fixedindexlist(empty_list);
+
+	// remove
+	empty_list.remove(11);
+	empty_list.remove(35);
+	empty_list.remove(45);
+	empty_list.remove(55);
+	empty_list.remove(99);
+
+	printf("remove\n");
+	print_fixedindexlist(empty_list);
+
+	// add
+	empty_list.add(11);
+	empty_list.add(35);
+	empty_list.add(99);
+
+	printf("add\n");
+	print_fixedindexlist(empty_list);
+}
+
 int main()
 {
 	load_weight(L"../learn");
 
-	//test_001();
-	//test_002();
-	//test_003();
-	//test_004();
-	//test_005();
+	test_001();
+	test_002();
+	test_003();
+	test_004();
+	test_005();
 	//test_ladder_search_001();
 	//test_ladder_search_002();
 	//test_ladder_search_003();
@@ -728,7 +777,8 @@ int main()
 	//test_pattern_003();
 	//test_legal_001();
 	//test_save_atari_001();
-	test_uctpattern_001();
+	//test_uctpattern_001();
+	//test_fixedindexlist();
 
 	printf("Press any key.\n");
 	getchar();
