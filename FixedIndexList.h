@@ -11,7 +11,10 @@ private:
 	I last;
 
 public:
-	FixedIndexList() : first(END), last(END) {}
+	void init() {
+		first = END;
+		last = END;
+	}
 
 	I begin() const {
 		return first;

@@ -204,6 +204,7 @@ public:
 		ko = -1;
 		pre_xy[0] = pre_xy[1] = -1;
 		// ‹ó”’‚ÌƒŠƒXƒg‰Šú‰»
+		empty_list.init();
 		for (XY y = BOARD_WIDTH; y < BOARD_MAX - BOARD_WIDTH; y += BOARD_WIDTH)
 		{
 			for (XY x = 1; x <= BOARD_SIZE; x++)
