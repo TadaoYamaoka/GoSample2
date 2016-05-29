@@ -150,12 +150,18 @@ bool is_exclude(char* next)
 	const char sido[] = { 0xe6, 0x8c, 0x87, 0xe5, 0xb0, 0x8e };
 	// ƒAƒ}(UTF-8)
 	const char ama[] = { 0xe3, 0x82, 0xa2, 0xe3, 0x83, 0x9e };
+	// ŽG’k(UTF-8)
+	const char zatsu[] = { 0xe9, 0x9b, 0x91, 0xe8, 0xab, 0x87 };
 
 	if (strsearch(ev, ev_len, sido, sizeof(sido)))
 	{
 		return true;
 	}
 	else if (strsearch(ev, ev_len, ama, sizeof(ama)))
+	{
+		return true;
+	}
+	else if (strsearch(ev, ev_len, zatsu, sizeof(zatsu)))
 	{
 		return true;
 	}
@@ -346,7 +352,14 @@ bool is_delete(FILE* fp, const wchar_t* infile)
 	{
 		Color color = get_color_from_sgf(next);
 		if (color == 0) {
-			continue;
+			if (turn == 0 || next[0] == ')')
+			{
+				continue;
+			}
+			else
+			{
+				return true;
+			}
 		}
 
 		XY xy = get_xy_from_sgf(next);

@@ -83,6 +83,15 @@ int wmain(int argc, wchar_t** argv)
 		extern void nakade_search(const wchar_t* dirs);
 		nakade_search(argv[2]);
 	}
+	else if (wcscmp(argv[1], L"cnn_features") == 0)
+	{
+		if (argc < 3)
+		{
+			return 1;
+		}
+		extern void make_cnn_features(const wchar_t* dirs);
+		make_cnn_features(argv[2]);
+	}
 
 	return 0;
 }
