@@ -214,3 +214,7 @@ _Pvt_Extensions/
 ModelManifest.xml
 /learn/cnn_features.bin
 /learn/cnn_features_list.txt
+/learn/sl_train.txt
+/learn/sl_train.bin
+/learn/sl_test.txt
+/learn/sl_test.bin
