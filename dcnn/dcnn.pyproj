@@ -13,7 +13,7 @@
     <Name>dcnn</Name>
     <RootNamespace>dcnn</RootNamespace>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>..\learn\cnn_features.bin</CommandLineArguments>
+    <CommandLineArguments>..\learn\cnn_features.bin --no_save</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">

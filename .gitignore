@@ -218,3 +218,5 @@ ModelManifest.xml
 /learn/sl_train.bin
 /learn/sl_test.txt
 /learn/sl_test.bin
+/dcnn/sl_policy.state
+/dcnn/sl_policy.model
