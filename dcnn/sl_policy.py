@@ -8,6 +8,7 @@ import chainer.links as L
 import os.path
 import argparse
 import time
+import random
 
 # 定数
 BITBOARD_SIZE = int(19*19/64 + 1) * 8
@@ -25,7 +26,7 @@ parser.add_argument('--resume', '-r', default='',
                     help='Resume the optimization from snapshot')
 parser.add_argument('--data_range', '-d', default='',
                     help='data range to use from input file')
-parser.add_argument('--iteration', '-i', default='2000',
+parser.add_argument('--iteration', '-i', default='',
                     help='iteration time')
 parser.add_argument('--weight_decay', '-w', default='0.003',
                     help='weight decay')
@@ -35,15 +36,18 @@ parser.add_argument('--test_mode', action='store_true',
                     help='predict only')
 args = parser.parse_args()
 
-
 # 全て読み込み
 infile = open(args.cnn_feature_input_file, "rb")
 filesize = os.path.getsize(args.cnn_feature_input_file)
 data = infile.read(filesize)
 infile.close()
-data_num = len(data) / DATA_SIZE
+data_num = int(len(data) / DATA_SIZE)
 if args.data_range != '':
     data_num = int(args.data_range)
+
+# シャッフル
+poslist = list(range(data_num))
+random.shuffle(poslist)
 
 # テストデータ読み込み
 if args.test_file != '':
@@ -87,10 +91,11 @@ class MyBias(link.Link):
     def __call__(self, x):
         return MyBiasFunction()(x, self.b)
 
-
+# DCNN定数
 minibatch_size = 16
 feature_num = 4
-k = 128
+k = 192
+
 model = Chain(
     layer1=L.Convolution2D(in_channels = feature_num, out_channels = k, ksize = 5, pad = 2),
     layer2=L.Convolution2D(in_channels = k, out_channels = k, ksize = 3, pad = 1),
@@ -164,12 +169,16 @@ def forward(x, train=True):
 
     return u13_1d
 
-def set_minibatch(data, data_num):
+def set_minibatch(data, data_num, poslist = None, i = -1):
     features_data = []
     teacher_data = []
     for j in range(minibatch_size):
-        # ランダムに選択
-        pos = np.random.randint(0, data_num) * DATA_SIZE
+        if poslist == None:
+            # ランダムに選択
+            pos = np.random.randint(0, data_num) * DATA_SIZE
+        else:
+            pos = poslist[i] * DATA_SIZE
+            i += 1
 
         xy = int.from_bytes(data[pos : pos + 2], 'little')
         #print("xy=", xy)
@@ -188,7 +197,11 @@ def set_minibatch(data, data_num):
 
     return features_data, teacher_data
 
-iteration = int(args.iteration)
+if args.iteration != '':
+    iteration = int(args.iteration)
+else:
+    iteration = int(data_num / minibatch_size)
+
 N = 100
 N_test = 10
 sum_loss = 0
@@ -196,7 +209,7 @@ sum_acc = 0
 start = time.time()
 for i in range(iteration):
     # ミニバッチデータ
-    features_data, teacher_data = set_minibatch(data, data_num)
+    features_data, teacher_data = set_minibatch(data, data_num, poslist, i * minibatch_size)
 
     # 入力
     features_nparray = np.array(features_data, dtype=np.float32)

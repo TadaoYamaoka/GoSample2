@@ -220,3 +220,4 @@ ModelManifest.xml
 /learn/sl_test.bin
 /dcnn/sl_policy.state
 /dcnn/sl_policy.model
+/dcnn/learn.txt
