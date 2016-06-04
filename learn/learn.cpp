@@ -363,6 +363,11 @@ bool is_delete(FILE* fp, const wchar_t* infile)
 		}
 
 		XY xy = get_xy_from_sgf(next);
+		if (board[xy] != EMPTY)
+		{
+			fprintf(stderr, "%S, turn = %d, %s, stone exist error.\n", infile, turn, next);
+			return true;
+		}
 		MoveResult result = board.move(xy, color, false);
 		if (result != SUCCESS)
 		{

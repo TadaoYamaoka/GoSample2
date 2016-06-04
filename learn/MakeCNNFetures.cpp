@@ -100,7 +100,7 @@ int make_cnn_features_sgf(const wchar_t* infile, FILE* ofp)
 				XY xy = y * BOARD_WIDTH + x;
 				Color color_xy = board[xy];
 
-				XY idx = y * BOARD_SIZE + x;
+				XY idx = (y - 1) * BOARD_SIZE + (x - 1);
 				if (color_xy == color)
 				{
 					player_color.bit_test_and_set(idx);

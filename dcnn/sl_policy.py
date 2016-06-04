@@ -114,7 +114,7 @@ model = Chain(
 
 model.to_gpu()
 
-optimizer = optimizers.Adam()
+optimizer = optimizers.SGD()
 optimizer.setup(model)
 optimizer.weight_decay(float(args.weight_decay))
 
@@ -134,10 +134,11 @@ def bitboard_to_array(bitboard):
         for i in range(8):
             x = xy % 19
             y = int(xy / 19)
-            if x == 0:
-                a.append([])
             c = (b >> i) & 1
-            a[y].append(c)
+            if x == 0:
+                a.append([c])
+            else:
+                a[y].append(c)
             xy += 1
             if xy == 19*19:
                 return a
@@ -150,19 +151,19 @@ def make_empty_array(player_color, opponent_color):
             empty[y].append((player_color[y][x] | opponent_color[y][x]) ^ 1)
     return empty
 
-def forward(x, train=True):
+def forward(x):
     z1 = F.relu(model.layer1(x))
-    z2 = F.dropout(F.relu(model.layer2(z1)), train=train)
-    z3 = F.dropout(F.relu(model.layer3(z2)), train=train)
-    z4 = F.dropout(F.relu(model.layer4(z3)), train=train)
-    z5 = F.dropout(F.relu(model.layer5(z4)), train=train)
-    z6 = F.dropout(F.relu(model.layer6(z5)), train=train)
-    z7 = F.dropout(F.relu(model.layer7(z6)), train=train)
-    z8 = F.dropout(F.relu(model.layer8(z7)), train=train)
-    z9 = F.dropout(F.relu(model.layer9(z8)), train=train)
-    z10 = F.dropout(F.relu(model.layer10(z9)), train=train)
-    z11 = F.dropout(F.relu(model.layer11(z10)), train=train)
-    z12 = F.dropout(F.relu(model.layer12(z11)), train=train)
+    z2 = F.relu(model.layer2(z1))
+    z3 = F.relu(model.layer3(z2))
+    z4 = F.relu(model.layer4(z3))
+    z5 = F.relu(model.layer5(z4))
+    z6 = F.relu(model.layer6(z5))
+    z7 = F.relu(model.layer7(z6))
+    z8 = F.relu(model.layer8(z7))
+    z9 = F.relu(model.layer9(z8))
+    z10 = F.relu(model.layer10(z9))
+    z11 = F.relu(model.layer11(z10))
+    z12 = F.relu(model.layer12(z11))
     u13 = model.layer13(z12)
 
     u13_1d = model.layer13_2(F.reshape(u13, (len(u13.data), 19*19)))
@@ -177,8 +178,7 @@ def set_minibatch(data, data_num, poslist = None, i = -1):
             # ランダムに選択
             pos = np.random.randint(0, data_num) * DATA_SIZE
         else:
-            pos = poslist[i] * DATA_SIZE
-            i += 1
+            pos = poslist[i + j] * DATA_SIZE
 
         xy = int.from_bytes(data[pos : pos + 2], 'little')
         #print("xy=", xy)
@@ -195,7 +195,33 @@ def set_minibatch(data, data_num, poslist = None, i = -1):
         features_data.append([player_color, opponent_color, empty, [[1]*19]*19])
         teacher_data.append(xy)
 
-    return features_data, teacher_data
+        # check
+        if xy < 0 or xy >= 19*19:
+            raise NameError('xy incorrect')
+        if empty[int(xy/19)][xy%19] != 1:
+            print(player_color)
+            print(opponent_color)
+            print(empty)
+            raise NameError('empty incorrect pos={}, xy={}, x={}, y={}'.format(pos, xy, xy%19, int(xy/19)))
+        sum_c = 0
+        for c in player_color:
+            sum_c += sum(c)
+        for c in opponent_color:
+            sum_c += sum(c)
+        for c in empty:
+            sum_c += sum(c)
+        if sum_c != 19*19:
+            raise NameError('board incorrect')
+
+    # 入力
+    #features = Variable(np.array(features_data, dtype=np.float32))
+    features = Variable(cuda.to_gpu(np.array(features_data, dtype=np.float32)))
+
+    # 教師データ
+    #teacher = Variable(np.array(teacher_data))
+    teacher = Variable(cuda.to_gpu(np.array(teacher_data)))
+
+    return features, teacher
 
 if args.iteration != '':
     iteration = int(args.iteration)
@@ -207,19 +233,13 @@ N_test = 10
 sum_loss = 0
 sum_acc = 0
 start = time.time()
+start_total = start
 for i in range(iteration):
     # ミニバッチデータ
-    features_data, teacher_data = set_minibatch(data, data_num, poslist, i * minibatch_size)
-
-    # 入力
-    features_nparray = np.array(features_data, dtype=np.float32)
-    features = Variable(cuda.to_gpu(features_nparray))
-
-    # 教師データ
-    teacher = Variable(cuda.to_gpu(np.array(teacher_data)))
+    features, teacher = set_minibatch(data, data_num, poslist, i * minibatch_size)
 
     # 順伝播
-    u13_1d = forward(features, not args.test_mode)
+    u13_1d = forward(features)
 
     if args.test_mode == False:
         optimizer.zero_grads()
@@ -240,13 +260,9 @@ for i in range(iteration):
             if args.test_file != '':
                 sum_acc = 0
                 for i_test in range(N_test):
-                    x_test_data, t_test_data = set_minibatch(testdata, testdata_num)
-                    # 入力
-                    x_test = Variable(cuda.to_gpu(np.array(x_test_data, dtype=np.float32)))
-                    # 教師データ
-                    t_test = Variable(cuda.to_gpu(np.array(t_test_data)))
+                    x_test, t_test = set_minibatch(testdata, testdata_num)
                     # 順伝播
-                    u13_1d = forward(x_test, False)
+                    u13_1d = forward(x_test)
                     sum_acc += F.accuracy(u13_1d, t_test).data
 
                 print(', accuracy={}'.format(sum_acc / N_test), end='')
@@ -258,11 +274,13 @@ for i in range(iteration):
         # test mode
         sum_acc += F.accuracy(u13_1d, teacher).data
 
+end_total = time.time()
+elapsed_total_time = end_total - start_total
+throughput_total = iteration / elapsed_total_time
+print('elapsed total time = {} sec, throughput = {} minibatch/sec'.format(elapsed_total_time, throughput_total))
+
 if args.test_mode == True:
-    end = time.time()
-    elapsed_time = end - start
-    throughput = iteration / elapsed_time
-    print(' accuracy={}, throughput={} minibatch/sec'.format(sum_acc / iteration, throughput))
+    print(' accuracy={}'.format(sum_acc / iteration))
 
 # Save the model and the optimizer
 if args.no_save == False and args.test_mode == False:
