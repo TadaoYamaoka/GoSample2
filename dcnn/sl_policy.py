@@ -28,8 +28,10 @@ parser.add_argument('--data_range', '-d', default='',
                     help='data range to use from input file')
 parser.add_argument('--iteration', '-i', default='',
                     help='iteration time')
-parser.add_argument('--weight_decay', '-w', default='0.003',
+parser.add_argument('--weight_decay', '-w', default='',
                     help='weight decay')
+parser.add_argument('--learning_rate', '-l', default='',
+                    help='learning rate ')
 parser.add_argument('--no_save', action='store_true',
                     help='no save')
 parser.add_argument('--test_mode', action='store_true',
@@ -114,9 +116,14 @@ model = Chain(
 
 model.to_gpu()
 
-optimizer = optimizers.SGD()
+if args.learning_rate != '':
+    optimizer = optimizers.SGD(float(args.learning_rate))
+else:
+    optimizer = optimizers.SGD()
+
 optimizer.setup(model)
-optimizer.weight_decay(float(args.weight_decay))
+if args.weight_decay != '':
+    optimizer.add_hook(WeightDecay(float(args.weight_decay)))
 
 # Init/Resume
 if args.initmodel:
