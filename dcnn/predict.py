@@ -7,35 +7,17 @@ import chainer.functions as F
 import chainer.links as L
 import os.path
 import argparse
-import time
-import random
 
 # 定数
 BITBOARD_SIZE = int(19*19/64 + 1) * 8
 DATA_SIZE = 2 + BITBOARD_SIZE * 2
 
-# 起動パラメータ(e.g. ..\learn\cnn_features.bin --no_save)
-parser = argparse.ArgumentParser(description='SL policy learning')
+# 起動パラメータ(e.g. ..\learn\cnn_features.bin sl_policy.model)
+parser = argparse.ArgumentParser(description='SL policy predict')
 parser.add_argument('cnn_feature_input_file',
-                    help='cnn features input file')
-parser.add_argument('--test_file', '-t', default='',
-                    help='test file')
-parser.add_argument('--initmodel', '-m', default='',
-                    help='Initialize the model from given file')
-parser.add_argument('--resume', '-r', default='',
-                    help='Resume the optimization from snapshot')
-parser.add_argument('--data_range', '-d', default='',
-                    help='data range to use from input file')
-parser.add_argument('--iteration', '-i', default='',
-                    help='iteration time')
-parser.add_argument('--weight_decay', '-w', default='',
-                    help='weight decay')
-parser.add_argument('--learning_rate', '-l', default='',
-                    help='learning rate ')
-parser.add_argument('--no_save', action='store_true',
-                    help='no save')
-parser.add_argument('--test_mode', action='store_true',
-                    help='predict only')
+                    help='features input file')
+parser.add_argument('model_file',
+                    help='sl policy model file')
 args = parser.parse_args()
 
 # 全て読み込み
@@ -44,20 +26,6 @@ filesize = os.path.getsize(args.cnn_feature_input_file)
 data = infile.read(filesize)
 infile.close()
 data_num = int(len(data) / DATA_SIZE)
-if args.data_range != '':
-    data_num = int(args.data_range)
-
-# シャッフル
-poslist = list(range(data_num))
-random.shuffle(poslist)
-
-# テストデータ読み込み
-if args.test_file != '':
-    testfile = open(args.test_file, "rb")
-    testfilesize = os.path.getsize(args.test_file)
-    testdata = testfile.read(testfilesize)
-    testfile.close()
-    testdata_num = len(testdata) / DATA_SIZE
 
 # bias
 def _as_mat(x):
@@ -94,7 +62,7 @@ class MyBias(link.Link):
         return MyBiasFunction()(x, self.b)
 
 # DCNN定数
-minibatch_size = 16
+minibatch_size = 2
 feature_num = 4
 k = 192
 
@@ -116,23 +84,10 @@ model = Chain(
 
 model.to_gpu()
 
-if args.learning_rate != '':
-    optimizer = optimizers.SGD(float(args.learning_rate))
-else:
-    optimizer = optimizers.SGD()
+serializers.load_npz(args.model_file, model)
 
-optimizer.setup(model)
-if args.weight_decay != '':
-    optimizer.add_hook(WeightDecay(float(args.weight_decay)))
-
-# Init/Resume
-if args.initmodel:
-    print('Load model from', args.initmodel)
-    serializers.load_npz(args.initmodel, model)
-if args.resume:
-    print('Load optimizer state from', args.resume)
-    serializers.load_npz(args.resume, optimizer)
-
+#print(model.layer1.W.data) # debug
+#print(model.layer1.b.data) # debug
 
 def bitboard_to_array(bitboard):
     a = []
@@ -160,6 +115,7 @@ def make_empty_array(player_color, opponent_color):
 
 def forward(x):
     z1 = F.relu(model.layer1(x))
+    #print(z1.data) # debug
     z2 = F.relu(model.layer2(z1))
     z3 = F.relu(model.layer3(z2))
     z4 = F.relu(model.layer4(z3))
@@ -177,15 +133,11 @@ def forward(x):
 
     return u13_1d
 
-def set_minibatch(data, data_num, poslist = None, i = -1):
+def set_minibatch(data, data_num, i = 0):
     features_data = []
     teacher_data = []
     for j in range(minibatch_size):
-        if poslist == None:
-            # ランダムに選択
-            pos = np.random.randint(0, data_num) * DATA_SIZE
-        else:
-            pos = poslist[i + j] * DATA_SIZE
+        pos = i * DATA_SIZE
 
         xy = int.from_bytes(data[pos : pos + 2], 'little')
         #print("xy=", xy)
@@ -230,68 +182,13 @@ def set_minibatch(data, data_num, poslist = None, i = -1):
 
     return features, teacher
 
-if args.iteration != '':
-    iteration = int(args.iteration)
-else:
-    iteration = int(data_num / minibatch_size)
+# ミニバッチデータ
+features, teacher = set_minibatch(data, data_num, 0)
 
-N = 100
-N_test = 10
-sum_loss = 0
-sum_acc = 0
-start = time.time()
-start_total = start
-for i in range(iteration):
-    # ミニバッチデータ
-    features, teacher = set_minibatch(data, data_num, poslist, i * minibatch_size)
+# 順伝播
+u13_1d = forward(features)
 
-    # 順伝播
-    u13_1d = forward(features)
+y_1d = F.softmax(u13_1d)
+y = F.reshape(y_1d, (minibatch_size, 19, 19))
 
-    if args.test_mode == False:
-        optimizer.zero_grads()
-        loss = F.softmax_cross_entropy(u13_1d, teacher)
-        #print(loss.data)
-        sum_loss += loss.data
-        loss.backward()
-        optimizer.update()
-
-        # lossとacc表示
-        if (i + 1) % N == 0:
-            end = time.time()
-            elapsed_time = end - start
-            throughput = N / elapsed_time
-            print('train mean loss={}, throughput={} minibatch/sec'.format(sum_loss / N, throughput), end='')
-
-            # accuracy
-            if args.test_file != '':
-                sum_acc = 0
-                for i_test in range(N_test):
-                    x_test, t_test = set_minibatch(testdata, testdata_num)
-                    # 順伝播
-                    u13_1d = forward(x_test)
-                    sum_acc += F.accuracy(u13_1d, t_test).data
-
-                print(', accuracy={}'.format(sum_acc / N_test), end='')
-
-            print()
-            start = time.time()
-            sum_loss = 0
-    else:
-        # test mode
-        sum_acc += F.accuracy(u13_1d, teacher).data
-
-end_total = time.time()
-elapsed_total_time = end_total - start_total
-throughput_total = iteration / elapsed_total_time
-print('elapsed total time = {} sec, throughput = {} minibatch/sec'.format(elapsed_total_time, throughput_total))
-
-if args.test_mode == True:
-    print(' accuracy={}'.format(sum_acc / iteration))
-
-# Save the model and the optimizer
-if args.no_save == False and args.test_mode == False:
-    print('save the model')
-    serializers.save_npz('sl_policy.model', model)
-    print('save the optimizer')
-    serializers.save_npz('sl_policy.state', optimizer)
+print(y.data)

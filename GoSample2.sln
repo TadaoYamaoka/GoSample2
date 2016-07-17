@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
-VisualStudioVersion = 14.0.25123.0
+VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GoSample2", "GoSample2.vcxproj", "{F5AE0D41-9DCA-4585-A1D3-1EF83215F260}"
 EndProject
@@ -10,6 +10,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "learn", "learn\learn.vcxproj", "{092C9016-716A-40CD-BD0B-BD297BA6BBC4}"
 EndProject
 Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "dcnn", "dcnn\dcnn.pyproj", "{C7709985-DBB1-42F8-88F8-29A3576AF6A5}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Predict", "Predict\Predict.vcxproj", "{DDF42A7E-4668-432D-AD69-638C5DED39C5}"
 EndProject
 Global
 	GlobalSection(Performance) = preSolution
@@ -60,6 +62,16 @@ Global
 		{C7709985-DBB1-42F8-88F8-29A3576AF6A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C7709985-DBB1-42F8-88F8-29A3576AF6A5}.Release|x64.ActiveCfg = Release|Any CPU
 		{C7709985-DBB1-42F8-88F8-29A3576AF6A5}.Release|x86.ActiveCfg = Release|Any CPU
+		{DDF42A7E-4668-432D-AD69-638C5DED39C5}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{DDF42A7E-4668-432D-AD69-638C5DED39C5}.Debug|x64.ActiveCfg = Debug|x64
+		{DDF42A7E-4668-432D-AD69-638C5DED39C5}.Debug|x64.Build.0 = Debug|x64
+		{DDF42A7E-4668-432D-AD69-638C5DED39C5}.Debug|x86.ActiveCfg = Debug|Win32
+		{DDF42A7E-4668-432D-AD69-638C5DED39C5}.Debug|x86.Build.0 = Debug|Win32
+		{DDF42A7E-4668-432D-AD69-638C5DED39C5}.Release|Any CPU.ActiveCfg = Release|Win32
+		{DDF42A7E-4668-432D-AD69-638C5DED39C5}.Release|x64.ActiveCfg = Release|x64
+		{DDF42A7E-4668-432D-AD69-638C5DED39C5}.Release|x64.Build.0 = Release|x64
+		{DDF42A7E-4668-432D-AD69-638C5DED39C5}.Release|x86.ActiveCfg = Release|Win32
+		{DDF42A7E-4668-432D-AD69-638C5DED39C5}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

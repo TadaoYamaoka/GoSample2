@@ -57,7 +57,11 @@ public:
 		return (N + BIT - 1) / BIT;
 	}
 
-	BitBoardPart get_bitboard_part(const int n) const {
+	const BitBoardPart get_bitboard_part(const int n) const {
+		return bitboard[n];
+	}
+
+	BitBoardPart& get_bitboard_part(const int n) {
 		return bitboard[n];
 	}
 

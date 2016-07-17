@@ -5,7 +5,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>c7709985-dbb1-42f8-88f8-29a3576af6a5</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>sl_policy.py</StartupFile>
+    <StartupFile>predict.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -13,7 +13,7 @@
     <Name>dcnn</Name>
     <RootNamespace>dcnn</RootNamespace>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <CommandLineArguments>..\learn\cnn_features.bin --no_save</CommandLineArguments>
+    <CommandLineArguments>..\learn\cnn_features.bin sl_policy.model</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
@@ -25,6 +25,9 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="predict.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="readtest.py" />
     <Compile Include="sl_policy.py">
       <SubType>Code</SubType>
