@@ -146,6 +146,7 @@
     <ClCompile Include="..\Human.cpp" />
     <ClCompile Include="..\learn\Hash.cpp" />
     <ClCompile Include="..\learn\learn.cpp" />
+    <ClCompile Include="..\learn\Optimizers.cpp" />
     <ClCompile Include="..\learn\Pattern.cpp" />
     <ClCompile Include="..\UCTParallel.cpp" />
     <ClCompile Include="..\UCTPattern.cpp" />

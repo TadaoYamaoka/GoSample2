@@ -123,7 +123,7 @@ public:
 			unsigned long idx;
 			if (::bit_scan_forward(&idx, bitboard[i]))
 			{
-				return pos + idx;
+				return pos + (short)idx;
 			}
 		}
 		return -1;
@@ -138,7 +138,7 @@ public:
 			unsigned long idx;
 			while (::bit_scan_forward(&idx, bitboard_tmp))
 			{
-				pos[num++] = pos_tmp + idx;
+				pos[num++] = pos_tmp + (short)idx;
 				if (num == 4)
 				{
 					return num;

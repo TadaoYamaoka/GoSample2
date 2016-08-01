@@ -4,7 +4,7 @@
 #include "Hash.h"
 
 extern void prepare_pattern(const wchar_t* dirs);
-extern void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_num, const float eta, const float ramda);
+extern void learn_pattern(const wchar_t* file, const int batch_size, int position_num);
 extern void check_hash();
 extern void dump_weight();
 extern void print_response_pattern(const ResponsePatternVal& val);

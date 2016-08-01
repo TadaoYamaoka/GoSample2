@@ -221,3 +221,9 @@ ModelManifest.xml
 /dcnn/sl_policy.state
 /dcnn/sl_policy.model
 /dcnn/learn.txt
+/learn/learn_result.txt
+/learn/learn_result2.txt
+/learn/kifulist.txt
+/learn/kifutest.txt
+/learn/rollout_datasource.bin
+/learn/rollout_datasource_list.txt

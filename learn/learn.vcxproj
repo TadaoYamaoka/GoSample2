@@ -24,13 +24,17 @@
     <ClCompile Include="learn.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MakeCNNFetures.cpp" />
+    <ClCompile Include="MakeRolloutDataSource.cpp" />
     <ClCompile Include="NakadeSearch.cpp" />
+    <ClCompile Include="Optimizers.cpp" />
     <ClCompile Include="Pattern.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Optimizers.h" />
     <ClInclude Include="Hash.h" />
     <ClInclude Include="learn.h" />
     <ClInclude Include="Pattern.h" />
+    <ClInclude Include="RolloutDataSource.h" />
     <ClInclude Include="Sgf.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

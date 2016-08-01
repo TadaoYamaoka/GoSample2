@@ -20,15 +20,13 @@ int wmain(int argc, wchar_t** argv)
 	}
 	else if (wcscmp(argv[1], L"learn") == 0)
 	{
-		if (argc < 7)
+		if (argc < 5)
 		{
 			return 1;
 		}
-		int game_num = _wtoi(argv[3]);
-		int iteration_num = _wtoi(argv[4]);
-		float eta = _wtof(argv[5]);
-		float ramda = _wtof(argv[6]);
-		learn_pattern(argv[2], game_num, iteration_num, eta, ramda);
+		int batch_size = _wtoi(argv[3]);
+		int position_num = _wtoi(argv[4]);
+		learn_pattern(argv[2], batch_size, position_num);
 	}
 	else if (wcscmp(argv[1], L"hash") == 0)
 	{
@@ -91,6 +89,15 @@ int wmain(int argc, wchar_t** argv)
 		}
 		extern void make_cnn_features(const wchar_t* dirs);
 		make_cnn_features(argv[2]);
+	}
+	else if (wcscmp(argv[1], L"rollout_datasource") == 0)
+	{
+		if (argc < 3)
+		{
+			return 1;
+		}
+		extern void make_rollout_datasource(const wchar_t* dirs);
+		make_rollout_datasource(argv[2]);
 	}
 
 	return 0;

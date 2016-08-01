@@ -4,12 +4,15 @@
 #include <vector>
 #include <chrono>
 #include <algorithm>
+#include <memory>
+#include <random>
 
 #include "learn.h"
 #include "../Board.h"
-#include "../Random.h"
 #include "Sgf.h"
 #include "Hash.h"
+#include "RolloutDataSource.h"
+#include "Optimizers.h"
 
 using namespace std;
 
@@ -29,17 +32,14 @@ void update_loss_graph();
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 
-// 学習係数
-float eta = 0.01;
-
 // 正則化係数
 float ramda = 0.00000001;
 
 struct WeightLoss
 {
 	float weight;
-	float g2;
 	int last_update_position;
+	AdaGrad optimizer;
 };
 
 // rollout policyの重み
@@ -299,42 +299,33 @@ float get_weight_map_val(T& weightmap, const K& key, const int learned_position_
 
 bool is_delete(FILE* fp, const wchar_t* infile)
 {
-	char buf[10000];
-	// 1行目読み飛ばし
-	fgets(buf, sizeof(buf), fp);
-	// 2行目
-	fgets(buf, sizeof(buf), fp);
-
-	int len = strlen(buf);
-	if (buf[len - 2] == ')')
-	{
-		return true;
-	}
-
-	if (strsearch(buf, len, ")(", 2) != nullptr)
-	{
-		return true;
-	}
+	fseek(fp, 0, SEEK_END);
+	int size = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	unique_ptr<char[]> buf(new char[size + 1]);
+	// 読み込み
+	fread(buf.get(), size, 1, fp);
+	buf[size] = '\0';
 
 	// ;で区切る
-	char* next = strtok(buf, ";");
-	int next_len = strlen(next);
+	char* next = strtok(buf.get(), ";");
 
-	// 指導碁除外
-	if (is_exclude(next))
-	{
-		return true;
-	}
+	// 1つ目を読み飛ばす
+	next = strtok(NULL, ";");
+
+	int next_len = strlen(next);
 
 	// 置き碁除外
 	if (strsearch(next, next_len, "AB[", 3) != nullptr)
 	{
+		fprintf(stderr, "%S, AB exist.\n", infile);
 		return true;
 	}
 
 	// 19路以外除外
 	if (strsearch(next, next_len, "SZ[19]", 6) == nullptr)
 	{
+		fprintf(stderr, "%S, size is not 19.\n", infile);
 		return true;
 	}
 
@@ -363,7 +354,7 @@ bool is_delete(FILE* fp, const wchar_t* infile)
 		}
 
 		XY xy = get_xy_from_sgf(next);
-		if (board[xy] != EMPTY)
+		if (xy != PASS && board[xy] != EMPTY)
 		{
 			fprintf(stderr, "%S, turn = %d, %s, stone exist error.\n", infile, turn, next);
 			return true;
@@ -413,7 +404,7 @@ void clean_kifu(const wchar_t* dirs)
 
 			wstring infile = finddir + L"\\" + win32fd.cFileName;
 
-			FILE* fp = _wfopen(infile.c_str(), L"r");
+			FILE* fp = _wfopen(infile.c_str(), L"rb");
 			bool isdelete = is_delete(fp, infile.c_str());
 			fclose(fp);
 
@@ -426,387 +417,334 @@ void clean_kifu(const wchar_t* dirs)
 	}
 }
 
-int learn_pattern_sgf(const wchar_t* infile, int &learned_position_num, FILE* errfile)
+void learn_pattern_position(const RolloutDataSource& datasrc, const int learned_position_num, map<WeightLoss*, float>& update_weight_map, float& rollout_loss, float& tree_loss)
 {
-	FILE* fp = _wfopen(infile, L"r");
-	char buf[10000];
-	// 1行目読み飛ばし
-	fgets(buf, sizeof(buf), fp);
-	// 2行目
-	fgets(buf, sizeof(buf), fp);
-
-	// ;で区切る
-	char* next = strtok(buf, ";");
-
-	// 指導碁除外
-	if (is_exclude(next))
-	{
-		fclose(fp);
-		return 0;
-	}
-
-	// 結果取得
-	Color win = get_win_from_re(next, infile);
-	if (win == 0)
-	{
-		fclose(fp);
-		return 0;
-	}
+	const XY xy = datasrc.xy;
 
 	Board board(19);
 
-	int turn = 0;
-	float rollout_loss = 0;
-	int rollout_loss_cnt = 0;
-	float tree_loss = 0;
-	int tree_loss_cnt = 0;
-	while ((next = strtok(NULL, ";")) != NULL)
+	// ビットボードを展開
+	for (XY y = 0; y < 19; y++)
 	{
-		Color color = get_color_from_sgf(next);
-		if (color == 0) {
-			continue;
-		}
-
-		XY xy = get_xy_from_sgf(next);
-
-		if (turn >= 8 && xy != PASS)
+		for (XY x = 0; x < 19; x++)
 		{
-			float rollout_e_sum = 0;
-			float rollout_e_y = 0;
-			float rollout_e_etc[19 * 19] = { 0 };
-
-			float tree_e_sum = 0;
-			float tree_e_y = 0;
-			float tree_e_etc[19 * 19] = { 0 };
-
-			struct Key
+			Color c = EMPTY;
+			if (datasrc.player_color.bit_test(y * 19 + x))
 			{
-				XY xy;
-				ResponsePatternVal response_val;
-				NonResponsePatternVal nonresponse_val;
-				Diamond12PatternVal diamond12_val;
-				bool is_save_atari;
-				bool is_self_atari;
-				bool is_neighbour;
-			};
-
-			Key key_y; // 教師データのキー
-			Key keys[19 * 19]; // 教師データの以外のキー
-			int key_num = 0;
-
-			// 重みの更新量
-			map<WeightLoss*, float> update_weight_map;
-
-			// アタリを助ける手を取得
-			BitBoard<BOARD_BYTE_MAX> atari_save;
-			board.get_atari_save(color, atari_save);
-
-			// 候補手一覧
-			for (XY txy = BOARD_WIDTH + 1; txy < BOARD_MAX - BOARD_WIDTH; txy++)
+				c = BLACK;
+			}
+			else if (datasrc.opponent_color.bit_test(y * 19 + x))
 			{
-				if (board.is_empty(txy) && board.is_legal(txy, color, false) == SUCCESS)
+				c = WHITE;
+			}
+
+			if (c != EMPTY)
+			{
+				const XY move_xy = get_xy(x + 1, y + 1);
+				MoveResult result = board.move(move_xy, c, false);
+				if (result != MoveResult::SUCCESS)
 				{
-					// 候補手パターン
-					// レスポンスパターン
-					ResponsePatternVal response_val = response_pattern_min(board, txy, color);
-
-					// ノンレスポンスパターン
-					NonResponsePatternVal nonresponse_val = nonresponse_pattern_min(board, txy, color);
-
-					// Diamond12パターン
-					Diamond12PatternVal diamond12_val = diamond12_pattern_min(board, txy, color);
-
-					bool is_save_atari_tmp = false;
-					bool is_self_atari_tmp = false;
-					bool is_neighbour_tmp = false;
-
-					// パラメータ更新準備
-					// rollout policy
-					// 重みの線形和
-					float rollout_weight_sum = get_weight_map_val(rpw_nonresponse_pattern_weight, nonresponse_val, learned_position_num);
-					if (response_val != 0)
-					{
-						//rollout_weight_sum += get_weight_val(rpw_response_match_weight, learned_position_num);
-						rollout_weight_sum += get_weight_map_val(rpw_response_pattern_weight, response_val, learned_position_num);
-					}
-					// アタリを助ける手か
-					if (atari_save.bit_test(txy))
-					{
-						rollout_weight_sum += get_weight_val(rpw_save_atari_weight, learned_position_num);
-					}
-					// 直前の手に隣接する手か
-					if (is_neighbour(board, txy))
-					{
-						rollout_weight_sum += get_weight_val(rpw_neighbour_weight, learned_position_num);
-					}
-
-					// 各手のsoftmaxを計算
-					float rollout_e = expf(rollout_weight_sum);
-					rollout_e_sum += rollout_e;
-					//printf("turn = %d, rollout_weight_sum = %f, rollout_e = %f, rollout_e_sum = %f\n", turn, rollout_weight_sum, rollout_e, rollout_e_sum);
-
-
-					// tree policy
-					// 重みの線形和
-					float tree_weight_sum = get_weight_map_val(tpw_nonresponse_pattern_weight, nonresponse_val, learned_position_num);
-					if (response_val != 0)
-					{
-						//tree_weight_sum += get_weight_val(tpw_response_match_weight, learned_position_num);
-						tree_weight_sum += get_weight_map_val(tpw_response_pattern_weight, response_val, learned_position_num);
-					}
-					// アタリを助ける手か
-					if (atari_save.bit_test(txy))
-					{
-						tree_weight_sum += get_weight_val(tpw_save_atari_weight, learned_position_num);
-						is_save_atari_tmp = true;
-					}
-					// 直前の手に隣接する手か
-					if (is_neighbour(board, txy))
-					{
-						tree_weight_sum += get_weight_val(tpw_neighbour_weight, learned_position_num);
-						is_neighbour_tmp = true;
-					}
-					// アタリになる手か
-					if (board.is_self_atari(color, txy))
-					{
-						is_self_atari_tmp = true;
-						tree_weight_sum += get_weight_val(tpw_self_atari_weight, learned_position_num);
-					}
-					// 直前2手からの距離
-					for (int move = 0; move < 2; move++)
-					{
-						if (board.pre_xy[move] != PASS)
-						{
-							XY distance = get_distance(txy, board.pre_xy[move]);
-							if (distance >= sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]))
-							{
-								distance = sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]) - 1;
-							}
-							tree_weight_sum += get_weight_val(tpw_last_move_distance_weight[move][distance], learned_position_num);
-						}
-					}
-					// 12-point diamondパターン
-					tree_weight_sum += get_weight_map_val(tpw_diamond12_pattern_weight, diamond12_val, learned_position_num);
-
-					// 各手のsoftmaxを計算
-					float tree_e = expf(tree_weight_sum);
-					tree_e_sum += tree_e;
-					//printf("turn = %d, tree_weight_sum = %f, tree_e = %f, tree_e_sum = %f\n", turn, tree_weight_sum, tree_e, tree_e_sum);
-
-
-					// 教師データと一致する場合
-					if (txy == xy)
-					{
-						rollout_e_y = rollout_e;
-						tree_e_y = tree_e;
-						key_y.xy = txy;
-						key_y.response_val = response_val;
-						key_y.nonresponse_val = nonresponse_val;
-						key_y.diamond12_val = diamond12_val;
-						key_y.is_save_atari = is_save_atari_tmp;
-						key_y.is_self_atari = is_self_atari_tmp;
-						key_y.is_neighbour = is_neighbour_tmp;
-					}
-					else {
-						rollout_e_etc[key_num] = rollout_e;
-						tree_e_etc[key_num] = tree_e;
-						keys[key_num].xy = txy;
-						keys[key_num].response_val = response_val;
-						keys[key_num].nonresponse_val = nonresponse_val;
-						keys[key_num].diamond12_val = diamond12_val;
-						keys[key_num].is_save_atari = is_save_atari_tmp;
-						keys[key_num].is_self_atari = is_self_atari_tmp;
-						keys[key_num].is_neighbour = is_neighbour_tmp;
-						key_num++;
-					}
+					fprintf(stderr, "move error.\n");
 				}
 			}
+		}
 
-			if (rollout_e_y == 0 || tree_e_y == 0)
-			{
-				fprintf(errfile, "%S, turn = %d, %s, supervised data not match.\n", infile, turn, next);
-				break;
-			}
+	}
 
-			// 教師データと一致する手のsoftmax
-			float rollout_y = rollout_e_y / rollout_e_sum;
-			//printf("rollout_y = %f\n", rollout_y);
-			float tree_y = tree_e_y / tree_e_sum;
+	board.pre_xy[0] = datasrc.pre_xy[0];
+	board.pre_xy[1] = datasrc.pre_xy[1];
 
-			// 教師データと一致する手のパラメータ更新
-			if (key_y.nonresponse_val != 0) // 空白パターンは制約条件として更新しない
+	// 色は黒固定
+	const Color color = BLACK;
+
+	float rollout_e_sum = 0;
+	float rollout_e_y = 0;
+	float rollout_e_etc[19 * 19] = { 0 };
+
+	float tree_e_sum = 0;
+	float tree_e_y = 0;
+	float tree_e_etc[19 * 19] = { 0 };
+
+	struct Key
+	{
+		XY xy;
+		ResponsePatternVal response_val;
+		NonResponsePatternVal nonresponse_val;
+		Diamond12PatternVal diamond12_val;
+		bool is_save_atari;
+		bool is_self_atari;
+		bool is_neighbour;
+	};
+
+	Key key_y; // 教師データのキー
+	Key keys[19 * 19]; // 教師データの以外のキー
+	int key_num = 0;
+
+	// アタリを助ける手を取得
+	BitBoard<BOARD_BYTE_MAX> atari_save;
+	board.get_atari_save(color, atari_save);
+
+	// 候補手一覧
+	for (XY txy = BOARD_WIDTH + 1; txy < BOARD_MAX - BOARD_WIDTH; txy++)
+	{
+		if (board.is_empty(txy) && board.is_legal(txy, color, false) == SUCCESS)
+		{
+			// 候補手パターン
+			// レスポンスパターン
+			ResponsePatternVal response_val = response_pattern_min(board, txy, color);
+
+			// ノンレスポンスパターン
+			NonResponsePatternVal nonresponse_val = nonresponse_pattern_min(board, txy, color);
+
+			// Diamond12パターン
+			Diamond12PatternVal diamond12_val = diamond12_pattern_min(board, txy, color);
+
+			bool is_save_atari_tmp = false;
+			bool is_self_atari_tmp = false;
+			bool is_neighbour_tmp = false;
+
+			// パラメータ更新準備
+			// rollout policy
+			// 重みの線形和
+			float rollout_weight_sum = get_weight_map_val(rpw_nonresponse_pattern_weight, nonresponse_val, learned_position_num);
+			if (response_val != 0)
 			{
-				// rollout policy
-				update_weight_map_y(rpw_nonresponse_pattern_weight, key_y.nonresponse_val, rollout_y, update_weight_map);
-				// tree policy
-				update_weight_map_y(tpw_nonresponse_pattern_weight, key_y.nonresponse_val, tree_y, update_weight_map);
-			}
-			if (key_y.response_val != 0)
-			{
-				// rollout policy
-				//update_weight_y(rpw_response_match_weight, rollout_y, update_weight_map);
-				update_weight_map_y(rpw_response_pattern_weight, key_y.response_val, rollout_y, update_weight_map);
-				// tree policy
-				//update_weight_y(tpw_response_match_weight, tree_y, update_weight_map);
-				update_weight_map_y(tpw_response_pattern_weight, key_y.response_val, tree_y, update_weight_map);
+				//rollout_weight_sum += get_weight_val(rpw_response_match_weight, learned_position_num);
+				rollout_weight_sum += get_weight_map_val(rpw_response_pattern_weight, response_val, learned_position_num);
 			}
 			// アタリを助ける手か
-			if (key_y.is_save_atari)
+			if (atari_save.bit_test(txy))
 			{
-				// rollout policy
-				update_weight_y(rpw_save_atari_weight, rollout_y, update_weight_map);
-				// tree policy
-				update_weight_y(tpw_save_atari_weight, tree_y, update_weight_map);
+				rollout_weight_sum += get_weight_val(rpw_save_atari_weight, learned_position_num);
 			}
 			// 直前の手に隣接する手か
-			if (key_y.is_neighbour)
+			if (is_neighbour(board, txy))
 			{
-				// rollout policy
-				update_weight_y(rpw_neighbour_weight, rollout_y, update_weight_map);
-				// tree policy
-				update_weight_y(tpw_neighbour_weight, tree_y, update_weight_map);
+				rollout_weight_sum += get_weight_val(rpw_neighbour_weight, learned_position_num);
+			}
+
+			// 各手のsoftmaxを計算
+			float rollout_e = expf(rollout_weight_sum);
+			rollout_e_sum += rollout_e;
+			//printf("turn = %d, rollout_weight_sum = %f, rollout_e = %f, rollout_e_sum = %f\n", turn, rollout_weight_sum, rollout_e, rollout_e_sum);
+
+
+			// tree policy
+			// 重みの線形和
+			float tree_weight_sum = get_weight_map_val(tpw_nonresponse_pattern_weight, nonresponse_val, learned_position_num);
+			if (response_val != 0)
+			{
+				//tree_weight_sum += get_weight_val(tpw_response_match_weight, learned_position_num);
+				tree_weight_sum += get_weight_map_val(tpw_response_pattern_weight, response_val, learned_position_num);
+			}
+			// アタリを助ける手か
+			if (atari_save.bit_test(txy))
+			{
+				tree_weight_sum += get_weight_val(tpw_save_atari_weight, learned_position_num);
+				is_save_atari_tmp = true;
+			}
+			// 直前の手に隣接する手か
+			if (is_neighbour(board, txy))
+			{
+				tree_weight_sum += get_weight_val(tpw_neighbour_weight, learned_position_num);
+				is_neighbour_tmp = true;
 			}
 			// アタリになる手か
-			if (key_y.is_self_atari)
+			if (board.is_self_atari(color, txy))
 			{
-				// tree policy
-				update_weight_y(tpw_self_atari_weight, tree_y, update_weight_map);
+				is_self_atari_tmp = true;
+				tree_weight_sum += get_weight_val(tpw_self_atari_weight, learned_position_num);
 			}
-			// 直前の2手からの距離
+			// 直前2手からの距離
 			for (int move = 0; move < 2; move++)
 			{
 				if (board.pre_xy[move] != PASS)
 				{
-					XY distance = get_distance(xy, board.pre_xy[move]);
-					if (distance == 0 && move == 0)
-					{
-						fprintf(errfile, "%S, turn = %d, %s, distance error.\n", infile, turn, next);
-						break;
-					}
+					XY distance = get_distance(txy, board.pre_xy[move]);
 					if (distance >= sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]))
 					{
 						distance = sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]) - 1;
 					}
-					update_weight_y(tpw_last_move_distance_weight[move][distance], tree_y, update_weight_map);
-					
+					tree_weight_sum += get_weight_val(tpw_last_move_distance_weight[move][distance], learned_position_num);
 				}
 			}
 			// 12-point diamondパターン
-			update_weight_map_y(tpw_diamond12_pattern_weight, key_y.diamond12_val, tree_y, update_weight_map);
+			tree_weight_sum += get_weight_map_val(tpw_diamond12_pattern_weight, diamond12_val, learned_position_num);
 
-			// 損失関数
-			rollout_loss += -logf(rollout_y);
-			rollout_loss_cnt++;
-			tree_loss += -logf(tree_y);
-			tree_loss_cnt++;
-			//printf("turn = %d, rollout_loss = %f, tree_loss = %f\n", turn, rollout_loss, tree_loss);
+			// 各手のsoftmaxを計算
+			float tree_e = expf(tree_weight_sum);
+			tree_e_sum += tree_e;
+			//printf("turn = %d, tree_weight_sum = %f, tree_e = %f, tree_e_sum = %f\n", turn, tree_weight_sum, tree_e, tree_e_sum);
 
-			// 教師データと一致しない手のパラメータ更新
-			for (int i = 0; i < key_num; i++)
+
+			// 教師データと一致する場合
+			if (txy == xy)
 			{
-				float rollout_y_etc = rollout_e_etc[i] / rollout_e_sum;
-				float tree_y_etc = tree_e_etc[i] / tree_e_sum;
-				if (keys[i].nonresponse_val != 0) // 空白パターンは制約条件として更新しない
-				{
-					// rollout policy
-					update_weight_map_y_etc(rpw_nonresponse_pattern_weight, keys[i].nonresponse_val, rollout_y_etc, update_weight_map);
-					// tree policy
-					update_weight_map_y_etc(tpw_nonresponse_pattern_weight, keys[i].nonresponse_val, tree_y_etc, update_weight_map);
-				}
-				if (keys[i].response_val != 0)
-				{
-					// rollout policy
-					//update_weight_y_etc(rpw_response_match_weight, rollout_y_etc, update_weight_map);
-					update_weight_map_y_etc(rpw_response_pattern_weight, keys[i].response_val, rollout_y_etc, update_weight_map);
-					// tree policy
-					//update_weight_y_etc(tpw_response_match_weight, tree_y_etc, update_weight_map);
-					update_weight_map_y_etc(tpw_response_pattern_weight, keys[i].response_val, tree_y_etc, update_weight_map);
-				}
-				// アタリを助ける手か
-				if (keys[i].is_save_atari)
-				{
-					// rollout policy
-					update_weight_y_etc(rpw_save_atari_weight, rollout_y_etc, update_weight_map);
-					// tree policy
-					update_weight_y_etc(tpw_save_atari_weight, tree_y_etc, update_weight_map);
-				}
-				// 直前の手に隣接する手か
-				if (keys[i].is_neighbour)
-				{
-					// rollout policy
-					update_weight_y_etc(rpw_neighbour_weight, rollout_y_etc, update_weight_map);
-					// tree policy
-					update_weight_y_etc(tpw_neighbour_weight, tree_y_etc, update_weight_map);
-				}
-				// アタリになる手か
-				if (keys[i].is_self_atari)
-				{
-					// tree policy
-					update_weight_y_etc(tpw_self_atari_weight, tree_y_etc, update_weight_map);
-				}
-				// 直前の2手からの距離
-				for (int move = 0; move < 2; move++)
-				{
-					if (board.pre_xy[move] != PASS)
-					{
-						XY distance = get_distance(keys[i].xy, board.pre_xy[move]);
-						if (distance == 0 && move == 0)
-						{
-							fprintf(errfile, "%S, turn = %d, %s, distance error.\n", infile, turn, next);
-							break;
-						}
-						if (distance >= sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]))
-						{
-							distance = sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]) - 1;
-						}
-						update_weight_y_etc(tpw_last_move_distance_weight[move][distance], tree_y_etc, update_weight_map);
-					}
-				}
-				// 12-point diamondパターン
-				update_weight_map_y_etc(tpw_diamond12_pattern_weight, keys[i].diamond12_val, tree_y_etc, update_weight_map);
+				rollout_e_y = rollout_e;
+				tree_e_y = tree_e;
+				key_y.xy = txy;
+				key_y.response_val = response_val;
+				key_y.nonresponse_val = nonresponse_val;
+				key_y.diamond12_val = diamond12_val;
+				key_y.is_save_atari = is_save_atari_tmp;
+				key_y.is_self_atari = is_self_atari_tmp;
+				key_y.is_neighbour = is_neighbour_tmp;
 			}
-
-			// 重み更新
-			for (const auto itr : update_weight_map)
-			{
-				WeightLoss* update_weight_loss = itr.first;
-				float grad = itr.second;
-				// AdaGrad
-				update_weight_loss->g2 += grad * grad;
-				update_weight_loss->weight -= eta * grad / sqrtf(update_weight_loss->g2);
+			else {
+				rollout_e_etc[key_num] = rollout_e;
+				tree_e_etc[key_num] = tree_e;
+				keys[key_num].xy = txy;
+				keys[key_num].response_val = response_val;
+				keys[key_num].nonresponse_val = nonresponse_val;
+				keys[key_num].diamond12_val = diamond12_val;
+				keys[key_num].is_save_atari = is_save_atari_tmp;
+				keys[key_num].is_self_atari = is_self_atari_tmp;
+				keys[key_num].is_neighbour = is_neighbour_tmp;
+				key_num++;
 			}
-			//printf("nonresponse0 = %f, %f, %llx\n", get_weight_map_val(rpw_nonresponse_pattern_weight, 0, learned_position_num), rpw_nonresponse_pattern_weight[0].weight, &rpw_nonresponse_pattern_weight[0]);
-
-			learned_position_num++;
-
-			// 空白パターンにはペナルティをかけない
-			rpw_nonresponse_pattern_weight[0].last_update_position = learned_position_num;
-			tpw_nonresponse_pattern_weight[0].last_update_position = learned_position_num;
 		}
-
-		const MoveResult result = board.move(xy, color, false);
-		if (result != SUCCESS)
-		{
-			fprintf(errfile, "%S, turn = %d, %s, move result error.\n", infile, turn, next);
-			break;
-		}
-
-		turn++;
 	}
 
-	// 損失関数の平均値表示
-	rollout_loss_data[loss_data_pos] = rollout_loss / rollout_loss_cnt;
-	tree_loss_data[loss_data_pos] = tree_loss / tree_loss_cnt;
-	printf("%S : rollout loss = %.5f, tree loss = %.5f\n", infile, rollout_loss_data[loss_data_pos], tree_loss_data[loss_data_pos]);
-	loss_data_pos++;
-	if (loss_data_pos >= sizeof(rollout_loss_data) / sizeof(rollout_loss_data[0]))
+	if (rollout_e_y == 0 || tree_e_y == 0)
 	{
-		loss_data_pos = 0;
+		fprintf(stderr, "supervised data not match.\n");
+		return;
 	}
 
-	fclose(fp);
+	// 教師データと一致する手のsoftmax
+	float rollout_y = rollout_e_y / rollout_e_sum;
+	//printf("rollout_y = %f\n", rollout_y);
+	float tree_y = tree_e_y / tree_e_sum;
 
-	return 1;
+	// 教師データと一致する手のパラメータ更新
+	if (key_y.nonresponse_val != 0) // 空白パターンは制約条件として更新しない
+	{
+		// rollout policy
+		update_weight_map_y(rpw_nonresponse_pattern_weight, key_y.nonresponse_val, rollout_y, update_weight_map);
+		// tree policy
+		update_weight_map_y(tpw_nonresponse_pattern_weight, key_y.nonresponse_val, tree_y, update_weight_map);
+	}
+	if (key_y.response_val != 0)
+	{
+		// rollout policy
+		//update_weight_y(rpw_response_match_weight, rollout_y, update_weight_map);
+		update_weight_map_y(rpw_response_pattern_weight, key_y.response_val, rollout_y, update_weight_map);
+		// tree policy
+		//update_weight_y(tpw_response_match_weight, tree_y, update_weight_map);
+		update_weight_map_y(tpw_response_pattern_weight, key_y.response_val, tree_y, update_weight_map);
+	}
+	// アタリを助ける手か
+	if (key_y.is_save_atari)
+	{
+		// rollout policy
+		update_weight_y(rpw_save_atari_weight, rollout_y, update_weight_map);
+		// tree policy
+		update_weight_y(tpw_save_atari_weight, tree_y, update_weight_map);
+	}
+	// 直前の手に隣接する手か
+	if (key_y.is_neighbour)
+	{
+		// rollout policy
+		update_weight_y(rpw_neighbour_weight, rollout_y, update_weight_map);
+		// tree policy
+		update_weight_y(tpw_neighbour_weight, tree_y, update_weight_map);
+	}
+	// アタリになる手か
+	if (key_y.is_self_atari)
+	{
+		// tree policy
+		update_weight_y(tpw_self_atari_weight, tree_y, update_weight_map);
+	}
+	// 直前の2手からの距離
+	for (int move = 0; move < 2; move++)
+	{
+		if (board.pre_xy[move] != PASS)
+		{
+			XY distance = get_distance(xy, board.pre_xy[move]);
+			if (distance == 0 && move == 0)
+			{
+				fprintf(stderr, "distance error.\n");
+				break;
+			}
+			if (distance >= sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]))
+			{
+				distance = sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]) - 1;
+			}
+			update_weight_y(tpw_last_move_distance_weight[move][distance], tree_y, update_weight_map);
+					
+		}
+	}
+	// 12-point diamondパターン
+	update_weight_map_y(tpw_diamond12_pattern_weight, key_y.diamond12_val, tree_y, update_weight_map);
+
+	// 教師データと一致しない手のパラメータ更新
+	for (int i = 0; i < key_num; i++)
+	{
+		float rollout_y_etc = rollout_e_etc[i] / rollout_e_sum;
+		float tree_y_etc = tree_e_etc[i] / tree_e_sum;
+		if (keys[i].nonresponse_val != 0) // 空白パターンは制約条件として更新しない
+		{
+			// rollout policy
+			update_weight_map_y_etc(rpw_nonresponse_pattern_weight, keys[i].nonresponse_val, rollout_y_etc, update_weight_map);
+			// tree policy
+			update_weight_map_y_etc(tpw_nonresponse_pattern_weight, keys[i].nonresponse_val, tree_y_etc, update_weight_map);
+		}
+		if (keys[i].response_val != 0)
+		{
+			// rollout policy
+			//update_weight_y_etc(rpw_response_match_weight, rollout_y_etc, update_weight_map);
+			update_weight_map_y_etc(rpw_response_pattern_weight, keys[i].response_val, rollout_y_etc, update_weight_map);
+			// tree policy
+			//update_weight_y_etc(tpw_response_match_weight, tree_y_etc, update_weight_map);
+			update_weight_map_y_etc(tpw_response_pattern_weight, keys[i].response_val, tree_y_etc, update_weight_map);
+		}
+		// アタリを助ける手か
+		if (keys[i].is_save_atari)
+		{
+			// rollout policy
+			update_weight_y_etc(rpw_save_atari_weight, rollout_y_etc, update_weight_map);
+			// tree policy
+			update_weight_y_etc(tpw_save_atari_weight, tree_y_etc, update_weight_map);
+		}
+		// 直前の手に隣接する手か
+		if (keys[i].is_neighbour)
+		{
+			// rollout policy
+			update_weight_y_etc(rpw_neighbour_weight, rollout_y_etc, update_weight_map);
+			// tree policy
+			update_weight_y_etc(tpw_neighbour_weight, tree_y_etc, update_weight_map);
+		}
+		// アタリになる手か
+		if (keys[i].is_self_atari)
+		{
+			// tree policy
+			update_weight_y_etc(tpw_self_atari_weight, tree_y_etc, update_weight_map);
+		}
+		// 直前の2手からの距離
+		for (int move = 0; move < 2; move++)
+		{
+			if (board.pre_xy[move] != PASS)
+			{
+				XY distance = get_distance(keys[i].xy, board.pre_xy[move]);
+				if (distance == 0 && move == 0)
+				{
+					fprintf(stderr, "distance error.\n");
+					break;
+				}
+				if (distance >= sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]))
+				{
+					distance = sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]) - 1;
+				}
+				update_weight_y_etc(tpw_last_move_distance_weight[move][distance], tree_y_etc, update_weight_map);
+			}
+		}
+		// 12-point diamondパターン
+		update_weight_map_y_etc(tpw_diamond12_pattern_weight, keys[i].diamond12_val, tree_y_etc, update_weight_map);
+	}
+
+	// 損失関数
+	rollout_loss += -logf(rollout_y);
+	tree_loss += -logf(tree_y);
 }
 
 void read_pattern(RolloutPolicyWeight& rpw, TreePolicyWeight& tpw)
@@ -926,6 +864,78 @@ void write_weight(const RolloutPolicyWeight& rpw, const TreePolicyWeight& tpw)
 	fclose(fp_weight);
 }
 
+void read_weight()
+{
+	// 重み読み込み
+	// rollout policy
+	FILE* fp_weight = fopen("rollout.bin", "rb");
+	fread(&rpw_save_atari_weight.weight, sizeof(rpw_save_atari_weight.weight), 1, fp_weight);
+	fread(&rpw_neighbour_weight.weight, sizeof(rpw_neighbour_weight.weight), 1, fp_weight);
+	//fread(&rpw_response_match_weight.weight, sizeof(rpw_response_match_weight.weight), 1, fp_weight);
+	int num;
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		ResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		rpw_response_pattern_weight.insert({ val,{ weight, 0 } });
+	}
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		NonResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		rpw_nonresponse_pattern_weight.insert({ val,{ weight, 0 } });
+	}
+	fclose(fp_weight);
+
+	// tree policy
+	fp_weight = fopen("tree.bin", "rb");
+	fread(&tpw_save_atari_weight.weight, sizeof(tpw_save_atari_weight.weight), 1, fp_weight);
+	fread(&tpw_neighbour_weight.weight, sizeof(tpw_neighbour_weight.weight), 1, fp_weight);
+	//fread(&tpw_response_match_weight.weight, sizeof(tpw_response_match_weight.weight), 1, fp_weight);
+	fread(&tpw_self_atari_weight.weight, sizeof(tpw_self_atari_weight.weight), 1, fp_weight);
+	for (int move = 0; move < 2; move++)
+	{
+		for (int i = 0; i < sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]); i++)
+		{
+			fread(&tpw_last_move_distance_weight[move][i].weight, sizeof(tpw_last_move_distance_weight[move][i].weight), 1, fp_weight);
+		}
+	}
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		ResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		tpw_response_pattern_weight.insert({ val,{ weight, 0 } });
+	}
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		NonResponsePatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		tpw_nonresponse_pattern_weight.insert({ val,{ weight, 0 } });
+	}
+	fread(&num, sizeof(num), 1, fp_weight);
+	for (int i = 0; i < num; i++)
+	{
+		Diamond12PatternVal val;
+		float weight;
+		fread(&val, sizeof(val), 1, fp_weight);
+		fread(&weight, sizeof(weight), 1, fp_weight);
+		tpw_diamond12_pattern_weight.insert({ val,{ weight, 0 } });
+	}
+	fclose(fp_weight);
+}
+
 void init_weight()
 {
 	RolloutPolicyWeight rpw;
@@ -961,161 +971,104 @@ void init_weight()
 	write_weight(rpw, tpw);
 }
 
-void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_num, const float eta, const float ramda)
+void learn_pattern(const wchar_t* file, const int batch_size, int position_num)
 {
-	::eta = eta;
-	::ramda = ramda;
-
-	printf("game_num = %d, iteration_num = %d, eta = %f, ramda = %f\n", game_num, iteration_num, eta, ramda);
-
-	int learned_game_num = 0; // 学習局数
-	int learned_position_num = 0; // 学習局面数
-
 	// 重み読み込み
-	// rollout policy
-	FILE* fp_weight = fopen("rollout.bin", "rb");
-	fread(&rpw_save_atari_weight.weight, sizeof(rpw_save_atari_weight.weight), 1, fp_weight);
-	fread(&rpw_neighbour_weight.weight, sizeof(rpw_neighbour_weight.weight), 1, fp_weight);
-	//fread(&rpw_response_match_weight.weight, sizeof(rpw_response_match_weight.weight), 1, fp_weight);
-	int num;
-	fread(&num, sizeof(num), 1, fp_weight);
-	for (int i = 0; i < num; i++)
-	{
-		ResponsePatternVal val;
-		float weight;
-		fread(&val, sizeof(val), 1, fp_weight);
-		fread(&weight, sizeof(weight), 1, fp_weight);
-		rpw_response_pattern_weight.insert({ val, { weight, 0 } });
-	}
-	fread(&num, sizeof(num), 1, fp_weight);
-	for (int i = 0; i < num; i++)
-	{
-		NonResponsePatternVal val;
-		float weight;
-		fread(&val, sizeof(val), 1, fp_weight);
-		fread(&weight, sizeof(weight), 1, fp_weight);
-		rpw_nonresponse_pattern_weight.insert({ val, { weight, 0 } });
-	}
-	fclose(fp_weight);
+	// 初回は事前にinitを実行していること
+	read_weight();
 
-	// tree policy
-	fp_weight = fopen("tree.bin", "rb");
-	fread(&tpw_save_atari_weight.weight, sizeof(tpw_save_atari_weight.weight), 1, fp_weight);
-	fread(&tpw_neighbour_weight.weight, sizeof(tpw_neighbour_weight.weight), 1, fp_weight);
-	//fread(&tpw_response_match_weight.weight, sizeof(tpw_response_match_weight.weight), 1, fp_weight);
-	fread(&tpw_self_atari_weight.weight, sizeof(tpw_self_atari_weight.weight), 1, fp_weight);
-	for (int move = 0; move < 2; move++)
+	// 入力データソース
+	vector<RolloutDataSource> datasource;
+	FILE *fp = _wfopen(file, L"rb");
+	while (true)
 	{
-		for (int i = 0; i < sizeof(tpw_last_move_distance_weight[0]) / sizeof(tpw_last_move_distance_weight[0][0]); i++)
+		datasource.push_back({});
+		RolloutDataSource& data = datasource.back();
+		int size = fread(&data, sizeof(data), 1, fp);
+		if (size == 0)
 		{
-			fread(&tpw_last_move_distance_weight[move][i].weight, sizeof(tpw_last_move_distance_weight[move][i].weight), 1, fp_weight);
+			break;
 		}
 	}
-	fread(&num, sizeof(num), 1, fp_weight);
-	for (int i = 0; i < num; i++)
-	{
-		ResponsePatternVal val;
-		float weight;
-		fread(&val, sizeof(val), 1, fp_weight);
-		fread(&weight, sizeof(weight), 1, fp_weight);
-		tpw_response_pattern_weight.insert({ val, { weight, 0 } });
-	}
-	fread(&num, sizeof(num), 1, fp_weight);
-	for (int i = 0; i < num; i++)
-	{
-		NonResponsePatternVal val;
-		float weight;
-		fread(&val, sizeof(val), 1, fp_weight);
-		fread(&weight, sizeof(weight), 1, fp_weight);
-		tpw_nonresponse_pattern_weight.insert({ val, { weight, 0 } });
-	}
-	fread(&num, sizeof(num), 1, fp_weight);
-	for (int i = 0; i < num; i++)
-	{
-		Diamond12PatternVal val;
-		float weight;
-		fread(&val, sizeof(val), 1, fp_weight);
-		fread(&weight, sizeof(weight), 1, fp_weight);
-		tpw_diamond12_pattern_weight.insert({ val, { weight, 0 } });
-	}
-	fclose(fp_weight);
+	fclose(fp);
 
-	// 入力ディレクトリ
-	FILE *fp_dirlist = _wfopen(dirs, L"r");
-	wchar_t dir[1024];
-	vector<wstring> dirlist;
-	while (fgetws(dir, sizeof(dir) / sizeof(dir[0]), fp_dirlist) != NULL)
+	// ランダムで並び替え
+	random_device seed_gen;
+	mt19937 engine(seed_gen());
+	shuffle(datasource.begin(), datasource.end(), engine);
+
+	// position_numが0のとき全件
+	if (position_num == 0)
 	{
-		wstring finddir(dir);
-		finddir.pop_back();
-		dirlist.push_back(finddir);
+		position_num = datasource.size();
 	}
-	fclose(fp_dirlist);
+	printf("batch_size = %d, position_num = %d\n", batch_size, position_num);
 
-	// ファイル一覧
-	vector<wstring> filelist;
-	vector<wstring> filelist_learn;
-	for (auto finddir : dirlist)
-	{
-		// 入力ファイル一覧
-		WIN32_FIND_DATA win32fd;
-		HANDLE hFind = FindFirstFile((finddir + L"\\*.sgf").c_str(), &win32fd);
-		if (hFind == INVALID_HANDLE_VALUE)
-		{
-			fprintf(stderr, "dir open error. %S\n", dir);
-			return;
-		}
-
-		do {
-			if (win32fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-				continue;
-			}
-
-			// ファイル一覧に追加
-			if (game_num == 0)
-			{
-				filelist_learn.push_back((finddir + L"\\" + win32fd.cFileName).c_str());
-			}
-			else
-			{
-				filelist.push_back((finddir + L"\\" + win32fd.cFileName).c_str());
-			}
-		} while (FindNextFile(hFind, &win32fd));
-	}
-
-	// ランダムで選択
-	Random random;
-	for (int i = 0; i < game_num; i++)
-	{
-		int select = random.random() % filelist.size();
-		filelist_learn.push_back(filelist[select]);
-	}
+	int iteration_num = position_num / batch_size;
 
 	// 損失のグラフ表示
 	display_loss_graph();
-
-	FILE* errfile = fopen("error.log", "w");
 
 	// 時間計測
 	auto start = chrono::system_clock::now();
 
 	// 棋譜を読み込んで学習
+	int learned_position_num = 0;
+	int update_loss_graph_cnt = 0;
+	float rollout_loss = 0.0f;
+	float tree_loss = 0.0f;
 	for (int i = 0; i < iteration_num; i++)
 	{
-		// シャッフル
-		random_shuffle(filelist_learn.begin(), filelist_learn.end());
-
-		for (wstring filepath : filelist_learn)
+		// 重みの更新量
+		map<WeightLoss*, float> update_weight_map;
+		
+		// ミニバッチ
+		for (int b = 0; b < batch_size; b++)
 		{
 			// パターン学習
-			learned_game_num += learn_pattern_sgf(filepath.c_str(), learned_position_num, errfile);
+			learn_pattern_position(datasource[i % datasource.size()], learned_position_num, update_weight_map, rollout_loss, tree_loss);
+			update_loss_graph_cnt++;
+		}
 
-			// グラフ表示更新
+		// 重み更新
+		for (const auto itr : update_weight_map)
+		{
+			WeightLoss* update_weight_loss = itr.first;
+			float grad = itr.second;
+
+			grad /= batch_size;
+
+			// 更新
+			update_weight_loss->weight -= update_weight_loss->optimizer(grad);
+		}
+
+		learned_position_num += batch_size;
+
+		// 空白パターンにはペナルティをかけない
+		rpw_nonresponse_pattern_weight[0].last_update_position = learned_position_num;
+		tpw_nonresponse_pattern_weight[0].last_update_position = learned_position_num;
+
+		// グラフ表示更新
+		if (update_loss_graph_cnt >= 1000)
+		{
+			// 損失関数の平均値表示
+			rollout_loss_data[loss_data_pos] = rollout_loss / update_loss_graph_cnt;
+			tree_loss_data[loss_data_pos] = tree_loss / update_loss_graph_cnt;
+			printf("rollout loss = %.5f, tree loss = %.5f\n", rollout_loss_data[loss_data_pos], tree_loss_data[loss_data_pos]);
+			loss_data_pos++;
+			if (loss_data_pos >= sizeof(rollout_loss_data) / sizeof(rollout_loss_data[0]))
+			{
+				loss_data_pos = 0;
+			}
 			update_loss_graph();
+
+			fflush(stdout);
+
+			rollout_loss = 0.0f;
+			tree_loss = 0.0f;
+			update_loss_graph_cnt = 0;
 		}
 	}
-
-	fclose(errfile);
 
 	// 未反映のペナルティを反映
 	// rollout policy
@@ -1267,11 +1220,11 @@ void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_
 
 	// 重み出力
 	// rollout policy
-	fp_weight = fopen("rollout.bin", "wb");
+	FILE* fp_weight = fopen("rollout.bin", "wb");
 	fwrite(&rpw_save_atari_weight.weight, sizeof(rpw_save_atari_weight.weight), 1, fp_weight);
 	fwrite(&rpw_neighbour_weight.weight, sizeof(rpw_neighbour_weight.weight), 1, fp_weight);
 	//fwrite(&rpw_response_match_weight.weight, sizeof(rpw_response_match_weight.weight), 1, fp_weight);
-	num = rpw_response_weight_sorted.size();
+	int num = rpw_response_weight_sorted.size();
 	fwrite(&num, sizeof(num), 1, fp_weight);
 	for (auto itr = rpw_response_weight_sorted.begin(); itr != rpw_response_weight_sorted.end(); itr++)
 	{
@@ -1324,35 +1277,28 @@ void learn_pattern(const wchar_t* dirs, const int game_num, const int iteration_
 	fclose(fp_weight);
 
 	printf("Press any key.\n");
+	fflush(stdout);
 	getchar();
 }
 
 int prepare_pattern_sgf(const wchar_t* infile, map<ResponsePatternVal, int>& response_pattern_map, map<NonResponsePatternVal, int>& nonresponse_pattern_map, map<Diamond12PatternVal, int>& diamond12_pattern_map)
 {
-	FILE* fp = _wfopen(infile, L"r");
-	char buf[10000];
-	// 1行目読み飛ばし
-	fgets(buf, sizeof(buf), fp);
-	// 2行目
-	fgets(buf, sizeof(buf), fp);
+	//printf("%S\n", infile);
+	FILE* fp = _wfopen(infile, L"rb");
+	fseek(fp, 0, SEEK_END);
+	int size = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	unique_ptr<char[]> buf(new char[size + 1]);
+	// 読み込み
+	fread(buf.get(), sizeof(char), size, fp);
+	buf[size] = '\0';
+	fclose(fp);
 
 	// ;で区切る
-	char* next = strtok(buf, ";");
+	char* next = strtok(buf.get(), ";");
 
-	// 指導碁、アマ除外
-	if (is_exclude(next))
-	{
-		fclose(fp);
-		return 0;
-	}
-
-	// 結果取得
-	Color win = get_win_from_re(next, infile);
-	if (win == 0)
-	{
-		fclose(fp);
-		return 0;
-	}
+	// 1つ目を読み飛ばす
+	next = strtok(NULL, ";");
 
 	Board board(19);
 
@@ -1396,8 +1342,6 @@ int prepare_pattern_sgf(const wchar_t* infile, map<ResponsePatternVal, int>& res
 		turn++;
 	}
 
-	fclose(fp);
-
 	return 1;
 }
 
@@ -1416,6 +1360,8 @@ void prepare_pattern(const wchar_t* dirs)
 	// 棋譜を読み込んで学習
 	while (fgetws(dir, sizeof(dir) / sizeof(dir[0]), fp_dirlist) != NULL)
 	{
+		printf("%S", dir);
+
 		// 入力ファイル一覧
 		wstring finddir(dir);
 		finddir.pop_back();
