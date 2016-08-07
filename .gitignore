@@ -227,3 +227,5 @@ ModelManifest.xml
 /learn/kifutest.txt
 /learn/rollout_datasource.bin
 /learn/rollout_datasource_list.txt
+/learn/learn_result_adagrad.txt
+/learn/learn_result_rmsprop.txt

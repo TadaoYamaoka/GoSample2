@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <memory>
 #include <random>
+#include <iterator>
+#include <algorithm>
 
 #include "learn.h"
 #include "../Board.h"
@@ -21,11 +23,15 @@ const int GRAPH_HEIGHT = 600;
 
 float rollout_loss_data[GRAPH_WIDTH * 2];
 float tree_loss_data[GRAPH_WIDTH * 2];
+float rollout_acc_data[GRAPH_WIDTH * 2];
+float tree_acc_data[GRAPH_WIDTH * 2];
 int loss_data_pos = 0;
 
 HWND hMainWnd;
 HPEN hPenRollout[2];
 HPEN hPenTree[2];
+HPEN hPenRolloutAcc[2];
+HPEN hPenTreeAcc[2];
 
 void display_loss_graph();
 void update_loss_graph();
@@ -39,7 +45,9 @@ struct WeightLoss
 {
 	float weight;
 	int last_update_position;
-	AdaGrad optimizer;
+	//SGD optimizer;
+	//AdaGrad optimizer;
+	RMSprop optimizer;
 };
 
 // rollout policyの重み
@@ -417,11 +425,24 @@ void clean_kifu(const wchar_t* dirs)
 	}
 }
 
-void learn_pattern_position(const RolloutDataSource& datasrc, const int learned_position_num, map<WeightLoss*, float>& update_weight_map, float& rollout_loss, float& tree_loss)
+struct Key
+{
+	XY xy;
+	ResponsePatternVal response_val;
+	NonResponsePatternVal nonresponse_val;
+	Diamond12PatternVal diamond12_val;
+	bool is_save_atari;
+	bool is_self_atari;
+	bool is_neighbour;
+};
+
+void forward_rollout_tree_policy_inner(const RolloutDataSource& datasrc, const int learned_position_num, Board& board,
+	float& rollout_e_sum, float& rollout_e_y, float rollout_e_etc[19 * 19], float& tree_e_sum, float& tree_e_y, float tree_e_etc[19 * 19],
+	Key& key_y, // 教師データのキー
+	Key keys[19 * 19], // 教師データの以外のキー
+	int& key_num)
 {
 	const XY xy = datasrc.xy;
-
-	Board board(19);
 
 	// ビットボードを展開
 	for (XY y = 0; y < 19; y++)
@@ -456,29 +477,6 @@ void learn_pattern_position(const RolloutDataSource& datasrc, const int learned_
 
 	// 色は黒固定
 	const Color color = BLACK;
-
-	float rollout_e_sum = 0;
-	float rollout_e_y = 0;
-	float rollout_e_etc[19 * 19] = { 0 };
-
-	float tree_e_sum = 0;
-	float tree_e_y = 0;
-	float tree_e_etc[19 * 19] = { 0 };
-
-	struct Key
-	{
-		XY xy;
-		ResponsePatternVal response_val;
-		NonResponsePatternVal nonresponse_val;
-		Diamond12PatternVal diamond12_val;
-		bool is_save_atari;
-		bool is_self_atari;
-		bool is_neighbour;
-	};
-
-	Key key_y; // 教師データのキー
-	Key keys[19 * 19]; // 教師データの以外のキー
-	int key_num = 0;
 
 	// アタリを助ける手を取得
 	BitBoard<BOARD_BYTE_MAX> atari_save;
@@ -604,6 +602,30 @@ void learn_pattern_position(const RolloutDataSource& datasrc, const int learned_
 			}
 		}
 	}
+}
+
+void learn_pattern_position(const RolloutDataSource& datasrc, const int learned_position_num, map<WeightLoss*, float>& update_weight_map, float& rollout_loss, float& tree_loss)
+{
+	const XY xy = datasrc.xy;
+
+	Board board(19);
+
+	float rollout_e_sum = 0;
+	float rollout_e_y = 0;
+	float rollout_e_etc[19 * 19] = { 0 };
+
+	float tree_e_sum = 0;
+	float tree_e_y = 0;
+	float tree_e_etc[19 * 19] = { 0 };
+
+	Key key_y; // 教師データのキー
+	Key keys[19 * 19]; // 教師データの以外のキー
+	int key_num = 0;
+
+	// 順伝播
+	forward_rollout_tree_policy_inner(datasrc, learned_position_num, board,
+		rollout_e_sum, rollout_e_y, rollout_e_etc, tree_e_sum, tree_e_y, tree_e_etc,
+		key_y, keys, key_num);
 
 	if (rollout_e_y == 0 || tree_e_y == 0)
 	{
@@ -747,7 +769,39 @@ void learn_pattern_position(const RolloutDataSource& datasrc, const int learned_
 	tree_loss += -logf(tree_y);
 }
 
-void read_pattern(RolloutPolicyWeight& rpw, TreePolicyWeight& tpw)
+void accuracy_rollout_tree_policy(const RolloutDataSource& datasrc, const int learned_position_num, float& rollout_acc, float& tree_acc)
+{
+	Board board(19);
+
+	float rollout_e_sum = 0;
+	float rollout_e_y = 0;
+	float rollout_e_etc[19 * 19] = { 0 };
+
+	float tree_e_sum = 0;
+	float tree_e_y = 0;
+	float tree_e_etc[19 * 19] = { 0 };
+
+	Key key_y; // 教師データのキー
+	Key keys[19 * 19]; // 教師データの以外のキー
+	int key_num = 0;
+
+	// 順伝播
+	forward_rollout_tree_policy_inner(datasrc, learned_position_num, board,
+		rollout_e_sum, rollout_e_y, rollout_e_etc, tree_e_sum, tree_e_y, tree_e_etc,
+		key_y, keys, key_num);
+
+	if (rollout_e_y == 0 || tree_e_y == 0)
+	{
+		fprintf(stderr, "supervised data not match.\n");
+		return;
+	}
+
+	// 教師データと一致する手のsoftmax
+	rollout_acc = rollout_e_y / rollout_e_sum;
+	tree_acc = tree_e_y / tree_e_sum;
+}
+
+void read_pattern_and_init_weight(RolloutPolicyWeight& rpw, TreePolicyWeight& tpw)
 {
 	FILE* fp = fopen("response.ptn", "rb");
 	if (fp == NULL)
@@ -788,6 +842,9 @@ void read_pattern(RolloutPolicyWeight& rpw, TreePolicyWeight& tpw)
 		tpw.nonresponse_pattern_weight.insert({ nonresponse, 0.0f });
 	}
 	fclose(fp);
+	// 空白パターンの重みを1にする(制約条件)
+	rpw.nonresponse_pattern_weight[0] = 1.0f;
+	tpw.nonresponse_pattern_weight[0] = 1.0f;
 
 	fp = fopen("diamond12.ptn", "rb");
 	if (fp == NULL)
@@ -959,7 +1016,7 @@ void init_weight()
 	}
 
 	// パターンを読み込んで初期化
-	read_pattern(rpw, tpw);
+	read_pattern_and_init_weight(rpw, tpw);
 
 	printf("rollout policy response pattern weight num = %d\n", rpw.response_pattern_weight.size());
 	printf("rollout policy nonresponse pattern weight num = %d\n", rpw.nonresponse_pattern_weight.size());
@@ -971,6 +1028,8 @@ void init_weight()
 	write_weight(rpw, tpw);
 }
 
+// position_numは学習する局面数
+// 入力データソースの数より大きい場合は繰り返し使用する
 void learn_pattern(const wchar_t* file, const int batch_size, int position_num)
 {
 	// 重み読み込み
@@ -978,8 +1037,8 @@ void learn_pattern(const wchar_t* file, const int batch_size, int position_num)
 	read_weight();
 
 	// 入力データソース
-	vector<RolloutDataSource> datasource;
 	FILE *fp = _wfopen(file, L"rb");
+	vector<RolloutDataSource> datasource;
 	while (true)
 	{
 		datasource.push_back({});
@@ -997,14 +1056,26 @@ void learn_pattern(const wchar_t* file, const int batch_size, int position_num)
 	mt19937 engine(seed_gen());
 	shuffle(datasource.begin(), datasource.end(), engine);
 
+	// 1割をテストデータとする
+	const int test_num = datasource.size() / 10;
+	// 残りを学習データとする
+	const int learn_num = datasource.size() - test_num;
+
+	vector<RolloutDataSource> learndata;
+	move(datasource.begin(), datasource.begin() + learn_num, back_inserter(learndata));
+
+	vector<RolloutDataSource> testdata;
+	move(datasource.begin() + learn_num, datasource.end(), back_inserter(testdata));
+
 	// position_numが0のとき全件
 	if (position_num == 0)
 	{
-		position_num = datasource.size();
+		position_num = learn_num;
 	}
-	printf("batch_size = %d, position_num = %d\n", batch_size, position_num);
 
 	int iteration_num = position_num / batch_size;
+
+	printf("batch_size = %d, position_num = %d, iteration_num = %d, learn_num = %d, test_num = %d\n", batch_size, position_num, iteration_num, learndata.size(), testdata.size());
 
 	// 損失のグラフ表示
 	display_loss_graph();
@@ -1014,19 +1085,29 @@ void learn_pattern(const wchar_t* file, const int batch_size, int position_num)
 
 	// 棋譜を読み込んで学習
 	int learned_position_num = 0;
-	int update_loss_graph_cnt = 0;
+	// loss
 	float rollout_loss = 0.0f;
 	float tree_loss = 0.0f;
-	for (int i = 0; i < iteration_num; i++)
+	int update_loss_graph_cnt = 0;
+	for (int j = 0, learn_i = 0, test_i = 0; j < iteration_num; j++)
 	{
+		if (j != 0 && j % (learn_num / batch_size) == 0)
+		{
+			// 繰り返し使用する場合はランダムで並び替える
+			random_device seed_gen;
+			mt19937 engine(seed_gen());
+			shuffle(learndata.begin(), learndata.end(), engine);
+		}
+
 		// 重みの更新量
 		map<WeightLoss*, float> update_weight_map;
-		
+
 		// ミニバッチ
 		for (int b = 0; b < batch_size; b++)
 		{
 			// パターン学習
-			learn_pattern_position(datasource[i % datasource.size()], learned_position_num, update_weight_map, rollout_loss, tree_loss);
+			learn_pattern_position(learndata[learn_i % learn_num], learned_position_num, update_weight_map, rollout_loss, tree_loss);
+			learn_i++;
 			update_loss_graph_cnt++;
 		}
 
@@ -1051,15 +1132,36 @@ void learn_pattern(const wchar_t* file, const int batch_size, int position_num)
 		// グラフ表示更新
 		if (update_loss_graph_cnt >= 1000)
 		{
-			// 損失関数の平均値表示
+			// 損失関数の平均値
 			rollout_loss_data[loss_data_pos] = rollout_loss / update_loss_graph_cnt;
 			tree_loss_data[loss_data_pos] = tree_loss / update_loss_graph_cnt;
-			printf("rollout loss = %.5f, tree loss = %.5f\n", rollout_loss_data[loss_data_pos], tree_loss_data[loss_data_pos]);
+
+			// accuracy計算
+			float rollout_acc_sum = 0;
+			float tree_acc_sum = 0;
+			const int test_batch_size = 100;
+			for (int b = 0; b < test_batch_size; b++)
+			{
+				float rollout_acc;
+				float tree_acc;
+				accuracy_rollout_tree_policy(testdata[test_i % test_num], learned_position_num, rollout_acc, tree_acc);
+				test_i++;
+				rollout_acc_sum += rollout_acc;
+				tree_acc_sum += tree_acc;
+			}
+			rollout_acc_data[loss_data_pos] = rollout_acc_sum / test_batch_size;
+			tree_acc_data[loss_data_pos] = tree_acc_sum / test_batch_size;
+
+			printf("learned position = %d, ", learn_i);
+			printf("rollout loss = %.5f, tree loss = %.5f, ", rollout_loss_data[loss_data_pos], tree_loss_data[loss_data_pos]);
+			printf("rollout accuracy = %.5f, tree accuracy = %.5f\n", rollout_acc_data[loss_data_pos], tree_acc_data[loss_data_pos]);
+
 			loss_data_pos++;
 			if (loss_data_pos >= sizeof(rollout_loss_data) / sizeof(rollout_loss_data[0]))
 			{
 				loss_data_pos = 0;
 			}
+
 			update_loss_graph();
 
 			fflush(stdout);
@@ -1112,6 +1214,10 @@ void learn_pattern(const wchar_t* file, const int batch_size, int position_num)
 	auto end = chrono::system_clock::now();
 	auto elapse = end - start;
 	printf("elapsed time = %lld ms\n", chrono::duration_cast<std::chrono::milliseconds>(elapse).count());
+
+	// 空白パターンが更新されていないことをチェック
+	printf("rollout policy empty nonresponse pattern weight = %f\n", rpw_nonresponse_pattern_weight[0].weight);
+	printf("tree policy empty nonresponse pattern weight = %f\n", tpw_nonresponse_pattern_weight[0].weight);
 
 	// 学習結果表示
 	// rollout policy
@@ -2174,6 +2280,11 @@ void display_loss_graph()
 	hPenTree[0] = (HPEN)CreatePen(PS_SOLID, 1, RGB(0, 0, 255));
 	hPenRollout[1] = (HPEN)CreatePen(PS_SOLID, 1, RGB(255, 170, 170));
 	hPenTree[1] = (HPEN)CreatePen(PS_SOLID, 1, RGB(170, 170, 255));
+	// for accuracy
+	hPenRolloutAcc[0] = (HPEN)CreatePen(PS_SOLID, 1, RGB(127, 0, 0));
+	hPenTreeAcc[0] = (HPEN)CreatePen(PS_SOLID, 1, RGB(0, 0, 127));
+	hPenRolloutAcc[1] = (HPEN)CreatePen(PS_SOLID, 1, RGB(127, 170, 170));
+	hPenTreeAcc[1] = (HPEN)CreatePen(PS_SOLID, 1, RGB(170, 170, 127));
 
 	ShowWindow(hMainWnd, SW_SHOW);
 	UpdateWindow(hMainWnd);
@@ -2218,7 +2329,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		for (int i = 0, n = n0; i < 2; i++, n = (n + 1) % 2)
 		{
 			int offset = GRAPH_WIDTH * n;
-			// rollout policy
+			// rollout policy loss
 			SelectObject(hDC, hPenRollout[i]);
 			MoveToEx(hDC, 0, GRAPH_HEIGHT - rollout_loss_data[offset] / max * GRAPH_HEIGHT, NULL);
 			for (int x = 1; x < GRAPH_WIDTH; x++)
@@ -2231,12 +2342,39 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				}
 			}
 
-			// tree policy
+			// tree policy loss
 			SelectObject(hDC, hPenTree[i]);
 			MoveToEx(hDC, 0, GRAPH_HEIGHT - tree_loss_data[offset] / max * GRAPH_HEIGHT, NULL);
 			for (int x = 1; x < GRAPH_WIDTH; x++)
 			{
 				LineTo(hDC, x, GRAPH_HEIGHT - tree_loss_data[offset + x] / max * GRAPH_HEIGHT);
+
+				if (n == n0 && offset + x >= loss_data_pos)
+				{
+					break;
+				}
+			}
+
+			const float acc_max = 0.5f;
+			// rollout policy accuracy
+			SelectObject(hDC, hPenRolloutAcc[i]);
+			MoveToEx(hDC, 0, GRAPH_HEIGHT - rollout_acc_data[offset] / acc_max * GRAPH_HEIGHT, NULL);
+			for (int x = 1; x < GRAPH_WIDTH; x++)
+			{
+				LineTo(hDC, x, GRAPH_HEIGHT - rollout_acc_data[offset + x] / acc_max * GRAPH_HEIGHT);
+
+				if (n == n0 && offset + x >= loss_data_pos)
+				{
+					break;
+				}
+			}
+
+			// tree policy accuracy
+			SelectObject(hDC, hPenTreeAcc[i]);
+			MoveToEx(hDC, 0, GRAPH_HEIGHT - tree_acc_data[offset] / acc_max * GRAPH_HEIGHT, NULL);
+			for (int x = 1; x < GRAPH_WIDTH; x++)
+			{
+				LineTo(hDC, x, GRAPH_HEIGHT - tree_acc_data[offset + x] / acc_max * GRAPH_HEIGHT);
 
 				if (n == n0 && offset + x >= loss_data_pos)
 				{
