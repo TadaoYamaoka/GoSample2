@@ -360,19 +360,28 @@ int UCTPattern::playout(Board& board, const Color color)
 			}
 			else {
 				// 確率に応じて手を選択
-				selected_i = possibles_num - 1;
-				selected_xy = possibles[selected_i].xy;
-				int e_weight_tmp = 0;
-				int r = random.random() % e_weight_sum;
-				for (int i = 0; i < possibles_num - 1; i++)
+				if (e_weight_sum > 0)
 				{
-					e_weight_tmp += possibles[i].e_weight;
-					if (r < e_weight_tmp)
+					selected_i = possibles_num - 1;
+					selected_xy = possibles[selected_i].xy;
+					int e_weight_tmp = 0;
+					int r = random.random() % e_weight_sum;
+					for (int i = 0; i < possibles_num - 1; i++)
 					{
-						selected_i = i;
-						selected_xy = possibles[i].xy;
-						break;
+						e_weight_tmp += possibles[i].e_weight;
+						if (r < e_weight_tmp)
+						{
+							selected_i = i;
+							selected_xy = possibles[i].xy;
+							break;
+						}
 					}
+				}
+				else
+				{
+					// パターンにマッチする手がない場合はランダムに選択
+					selected_i = random.random() % possibles_num;
+					selected_xy = possibles[selected_i].xy;
 				}
 			}
 
