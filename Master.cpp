@@ -392,7 +392,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						printf("%d: playout num = %d, created node num = %5d", color, root->playout_num_sum, player->get_created_node_cnt());
 						if (typeid(*current_player) == typeid(UCTSLPolicy))
 						{
-							printf(", dcnn node num = %d", dcnn_exec_cnt * minibatch_size);
+							printf(", dcnn node num = %d, dcnn depth avr = %f", dcnn_exec_cnt * minibatch_size, float(dcnn_depth_sum) / (dcnn_exec_cnt * minibatch_size));
 						}
 						printf(", elapse time = %4d ms\n", elapseTime);
 					}
@@ -773,7 +773,7 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
 					fprintf(logfp, "%d: playout num = %d, created node num = %5d", color, root->playout_num_sum, player->get_created_node_cnt());
 					if (typeid(*current_player) == typeid(UCTSLPolicy))
 					{
-						fprintf(logfp, ", dcnn node num = %d", dcnn_exec_cnt * minibatch_size);
+						fprintf(logfp, ", dcnn node num = %d, dcnn depth avr = %f", dcnn_exec_cnt * minibatch_size, float(dcnn_depth_sum) / (dcnn_exec_cnt * minibatch_size));
 					}
 					fprintf(logfp, ", elapse time = %4d ms\n", elapseTime);
 				}

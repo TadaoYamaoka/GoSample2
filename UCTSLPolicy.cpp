@@ -10,7 +10,7 @@ const int THREAD_NUM = 1; // スレッド数
 #endif // !_DEBUG
 
 const float CPUCT = 10.0f; // PUCT定数
-const int THR = 30; // ノード展開の閾値
+const int THR = 15; // ノード展開の閾値
 
 extern thread_local Random random;
 
@@ -28,6 +28,7 @@ float dcnn_srcData[minibatch_size][feature_num][19][19]; // 入力特徴
 
 // DCNN実行回数
 int dcnn_exec_cnt;
+int dcnn_depth_sum;
 
 // UCBからプレイアウトする手を選択
 UCTNode* UCTSLPolicy::select_node_with_ucb(const Board& board, const Color color, UCTNode* node)
@@ -67,7 +68,7 @@ UCTNode* UCTSLPolicy::select_node_with_ucb(const Board& board, const Color color
 }
 
 // DCNN要求
-void request_dcnn(const Board& board, const Color color, UCTNode* node, bool& dcnn_requested)
+void request_dcnn(const Board& board, const Color color, UCTNode* node, bool& dcnn_requested, const int depth)
 {
 	// SL policy未要求の場合
 	if (!node->dcnn_requested && !dcnn_requested)
@@ -116,6 +117,8 @@ void request_dcnn(const Board& board, const Color color, UCTNode* node, bool& dc
 
 			// 準備済み
 			dcnn_request_prepared++;
+
+			dcnn_depth_sum += depth;
 		}
 		// キューに空きがなかった場合も、親ノードからDCNNを実行するため枝ノードでは要求済みとする
 		dcnn_requested = true;
@@ -123,10 +126,10 @@ void request_dcnn(const Board& board, const Color color, UCTNode* node, bool& dc
 }
 
 // UCT
-int UCTSLPolicy::search_uct(Board& board, const Color color, UCTNode* node, bool& dcnn_requested)
+int UCTSLPolicy::search_uct(Board& board, const Color color, UCTNode* node, bool& dcnn_requested, int depth)
 {
 	// DCNN要求
-	request_dcnn(board, color, node, dcnn_requested);
+	request_dcnn(board, color, node, dcnn_requested, depth);
 
 	// UCBからプレイアウトする手を選択
 	UCTNode* selected_node;
@@ -161,7 +164,7 @@ int UCTSLPolicy::search_uct(Board& board, const Color color, UCTNode* node, bool
 				// 展開されたノードの着手確率をtree policyを使用して算出
 				compute_tree_policy(board, opponent(color), selected_node);
 
-				win = 1 - search_uct(board, opponent(color), selected_node, dcnn_requested);
+				win = 1 - search_uct(board, opponent(color), selected_node, dcnn_requested, depth + 1);
 			}
 			else {
 				// ノードプール不足
@@ -169,7 +172,7 @@ int UCTSLPolicy::search_uct(Board& board, const Color color, UCTNode* node, bool
 			}
 		}
 		else {
-			win = 1 - search_uct(board, opponent(color), selected_node, dcnn_requested);
+			win = 1 - search_uct(board, opponent(color), selected_node, dcnn_requested, depth + 1);
 		}
 	}
 
@@ -211,7 +214,7 @@ void UCTSLPolicy::search_uct_root(Board& board, const Color color, UCTNode* node
 				// 展開されたノードの着手確率をtree policyを使用して算出
 				compute_tree_policy(board, opponent(color), selected_node_copy);
 
-				win = 1 - search_uct(board, opponent(color), selected_node_copy, dcnn_requested);
+				win = 1 - search_uct(board, opponent(color), selected_node_copy, dcnn_requested, 1);
 			}
 			else {
 				// ノードプール不足
@@ -219,7 +222,7 @@ void UCTSLPolicy::search_uct_root(Board& board, const Color color, UCTNode* node
 			}
 		}
 		else {
-			win = 1 - search_uct(board, opponent(color), selected_node_copy, dcnn_requested);
+			win = 1 - search_uct(board, opponent(color), selected_node_copy, dcnn_requested, 1);
 		}
 	}
 
@@ -244,7 +247,7 @@ XY UCTSLPolicy::select_move(Board& board, Color color)
 	bool dcnn_requested = false;
 	dcnn_request_prepared = 0;
 	dcnn_request_cnt = 0;
-	request_dcnn(board, color, root, dcnn_requested);
+	request_dcnn(board, color, root, dcnn_requested, 0);
 
 	/*
 	// 1手目はtree policyを使わずにDCNNの計算結果を使う
@@ -269,6 +272,7 @@ XY UCTSLPolicy::select_move(Board& board, Color color)
 
 	// 実行回数カウント
 	dcnn_exec_cnt = 0;
+	dcnn_depth_sum = 0;
 
 	// DCNN用スレッド
 	bool dcnn_exit = false;
