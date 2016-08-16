@@ -7,7 +7,7 @@
 using namespace std;
 
 typedef map<string, float*> ParamMap;
-shared_ptr<ParamMap> load_cnn_param(const char* filename);
+shared_ptr<ParamMap> load_cnn_param(const wchar_t* filename);
 
 #pragma pack(push, 1)
 struct LocalFileHeader

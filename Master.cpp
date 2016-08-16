@@ -7,12 +7,14 @@
 #include "UCTParallel.h"
 #include "UCTSaveAtari.h"
 #include "UCTPattern.h"
+#include "UCTSLPolicy.h"
 #include "Human.h"
+#include "log.h"
 
 using namespace std;
 
 // プレイヤー一覧
-Player* playerList[] = {new UCTSample(), new UCTParallel(), new UCTSaveAtari(), new UCTPattern(), new Human()};
+Player* playerList[] = {new UCTSample(), new UCTParallel(), new UCTSaveAtari(), new UCTPattern(), new UCTSLPolicy(), new Human()};
 
 static bool isPalying = false;
 static Board board;
@@ -78,6 +80,7 @@ int wmain(int argc, wchar_t* argv[]) {
 			{
 				i++;
 				logfile = argv[i];
+				open_logfile(logfile);
 			}
 		}
 		else if (wcscmp(argv[i], L"-sgf") == 0)
@@ -156,6 +159,14 @@ int wmain(int argc, wchar_t* argv[]) {
 			{
 				i++;
 				load_weight(argv[i]);
+			}
+		}
+		else if (wcscmp(argv[i], L"-dcnn") == 0)
+		{
+			if (i + 1 < argc)
+			{
+				i++;
+				cnn.prepare_network(argv[i]);
 			}
 		}
 		else {
@@ -378,7 +389,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					{
 						UCTSample* player = (UCTSample*)current_player;
 						UCTNode* root = player->root;
-						printf("%d: playout num = %d, created node num = %5d, elapse time = %4d ms\n", color, root->playout_num_sum, player->get_created_node_cnt(), elapseTime);
+						printf("%d: playout num = %d, created node num = %5d", color, root->playout_num_sum, player->get_created_node_cnt());
+						if (typeid(*current_player) == typeid(UCTSLPolicy))
+						{
+							printf(", dcnn node num = %d", dcnn_exec_cnt * minibatch_size);
+						}
+						printf(", elapse time = %4d ms\n", elapseTime);
 					}
 
 					// 描画更新
@@ -629,23 +645,14 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
 
 	char line[256];
 	char* err;
-	FILE* fp;
-	if (logfile)
-	{
-		fp = _wfopen(logfile, L"a");
-		if (!fp)
-		{
-			fprintf(stderr, "log file open error.\n");
-			return 0;
-		}
-	}
+
 	while ((err = gets_s(line, sizeof(line))) != nullptr)
 	{
 		// ログ出力
 		if (logfile)
 		{
-			fprintf(fp, "%s\n", line);
-			fflush(fp);
+			fprintf(logfp, "%s\n", line);
+			fflush(logfp);
 		}
 
 		if (strcmp(line, "name") == 0)
@@ -736,7 +743,10 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
 
 			current_player = players[color - 1];
 
+			DWORD startTime = GetTickCount();
 			XY xy = current_player->select_move(board, color);
+			DWORD elapseTime = GetTickCount() - startTime;
+
 			MoveResult ret = board.move(xy, color, false);
 			while (ret != SUCCESS)
 			{
@@ -751,6 +761,23 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
 			}
 			else {
 				printf("= %c%d\n\n", gtp_axis_x[get_x(xy)], GRID_SIZE - get_y(xy) + 1);
+			}
+
+			// プレイアウト数と時間をログ出力
+			if (logfile)
+			{
+				if (dynamic_cast<UCTSample*>(current_player) != NULL)
+				{
+					UCTSample* player = (UCTSample*)current_player;
+					UCTNode* root = player->root;
+					fprintf(logfp, "%d: playout num = %d, created node num = %5d", color, root->playout_num_sum, player->get_created_node_cnt());
+					if (typeid(*current_player) == typeid(UCTSLPolicy))
+					{
+						fprintf(logfp, ", dcnn node num = %d", dcnn_exec_cnt * minibatch_size);
+					}
+					fprintf(logfp, ", elapse time = %4d ms\n", elapseTime);
+				}
+				fflush(logfp);
 			}
 
 			// UCTの勝率を保存
@@ -781,7 +808,7 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
 	}
 	if (logfile)
 	{
-		fclose(fp);
+		fclose(logfp);
 	}
 
 	return 0;

@@ -5,7 +5,7 @@
 class UCTParallel :	public UCTSample
 {
 protected:
-	static void search_uct_root(Board& board, const Color color, UCTNode* node, const std::map<UCTNode*, UCTNode*>& copynodemap);
+	static void search_uct_root(Board& board, const Color color, UCTNode* node, UCTNode* copychild);
 	static void expand_root_node(const Board& board, const Color color, UCTNode* root);
 
 public:

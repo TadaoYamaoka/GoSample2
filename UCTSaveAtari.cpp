@@ -218,7 +218,7 @@ int UCTSaveAtari::search_uct(Board& board, const Color color, UCTNode* node)
 	return win;
 }
 
-void UCTSaveAtari::search_uct_root(Board& board, const Color color, UCTNode* node, const std::map<UCTNode*, UCTNode*>& copynodemap)
+void UCTSaveAtari::search_uct_root(Board& board, const Color color, UCTNode* node, UCTNode* copychild)
 {
 	// UCBからプレイアウトする手を選択
 	// rootノードはアトミックに更新するためUCB計算ではロックしない
@@ -228,7 +228,7 @@ void UCTSaveAtari::search_uct_root(Board& board, const Color color, UCTNode* nod
 	board.move_legal(selected_node->xy, color);
 
 	// コピーされたノードに変換
-	UCTNode* selected_node_copy = copynodemap.at(selected_node);
+	UCTNode* selected_node_copy = copychild + (selected_node - node->child);
 
 	int win;
 
@@ -279,23 +279,21 @@ XY UCTSaveAtari::select_move(Board& board, Color color)
 	std::thread th[THREAD_NUM];
 	for (int th_i = 0; th_i < THREAD_NUM; th_i++)
 	{
-		th[th_i] = std::thread([root, board, color] {
-			// rootノードのコピー(子ノードのポインタと新たに作成したノードを対応付ける)
-			std::map<UCTNode*, UCTNode*> copynodemap;
-			UCTNode* copynode = create_child_node(root->child_num);
-			if (copynode == nullptr)
+		th[th_i] = std::thread([root, &board, color] {
+			// rootの子ノードのコピー
+			UCTNode* copychild = create_child_node(root->child_num);
+			if (copychild == nullptr)
 			{
 				fprintf(stderr, "node pool too small\n");
 				return;
 			}
+
 			for (int i = 0; i < root->child_num; i++)
 			{
-				copynode[i].xy = root->child[i].xy;
-				copynode[i].playout_num = 0;
-				copynode[i].playout_num_sum = 0;
-				copynode[i].child_num = 0;
-
-				copynodemap.insert({ root->child + i, copynode + i });
+				copychild[i].xy = root->child[i].xy;
+				copychild[i].playout_num = 0;
+				copychild[i].playout_num_sum = 0;
+				copychild[i].child_num = 0;
 			}
 
 			for (int i = 0; i < PLAYOUT_MAX / THREAD_NUM; i++)
@@ -304,7 +302,7 @@ XY UCTSaveAtari::select_move(Board& board, Color color)
 				Board board_tmp = board;
 
 				// UCT
-				search_uct_root(board_tmp, color, root, copynodemap);
+				search_uct_root(board_tmp, color, root, copychild);
 			}
 		});
 	}

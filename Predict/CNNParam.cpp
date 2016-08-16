@@ -4,7 +4,7 @@
 
 using namespace std;
 
-shared_ptr<ParamMap> load_cnn_param(const char* filename)
+shared_ptr<ParamMap> load_cnn_param(const wchar_t* filename)
 {
 	shared_ptr<ParamMap> param_map(new ParamMap());
 

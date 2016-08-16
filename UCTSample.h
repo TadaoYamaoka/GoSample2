@@ -15,8 +15,8 @@ public:
 
 	bool is_atari_save; // アタリを助ける手か
 
-	// tree policy
-	float probability;
+	float probability; // tree policy or sl policy
+	bool dcnn_requested; // SL policy計算済みフラグ
 
 	bool expand_node(const Board& board);
 };

@@ -21,6 +21,7 @@ UCTNode* create_root_node()
 	node_pool_cnt = 1; // rootノード作成時はロック不要
 	node_pool[0].playout_num_sum = 0;
 	node_pool[0].child_num = 0;
+	node_pool[0].dcnn_requested = false;
 	return node_pool;
 }
 
@@ -61,6 +62,8 @@ bool UCTNode::expand_node(const Board& board)
 		child[i].playout_num_sum = 0;
 		child[i].win_num = 0;
 		child[i].child_num = 0;
+		child[i].probability = 0;
+		child[i].dcnn_requested = false;
 		i++;
 	}
 	// PASSを追加
@@ -69,6 +72,8 @@ bool UCTNode::expand_node(const Board& board)
 	child[i].playout_num_sum = 0;
 	child[i].win_num = 0;
 	child[i].child_num = 0;
+	child[i].probability = 0;
+	child[i].dcnn_requested = false;
 
 	return true;
 }

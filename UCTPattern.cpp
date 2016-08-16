@@ -11,7 +11,7 @@ const int THREAD_NUM = 8; // 論理コア数
 const int THREAD_NUM = 1; // 論理コア数
 #endif // !_DEBUG
 
-const float CPUCT = 20.0f; // PUCT定数
+const float CPUCT = 10.0f; // PUCT定数
 const float C = 1.0f; // UCB定数
 const float FPU = 1.0f; // First Play Urgency
 const int THR = 15; // ノード展開の閾値
@@ -441,7 +441,7 @@ UCTNode* UCTPattern::select_node_with_ucb(const Board& board, const Color color,
 		else if (child->xy != PASS && child->playout_num < THR) // 閾値以下の場合tree policyを使用
 		{
 			// PUCT
-			ucb = float(child->win_num) / child->playout_num + CPUCT * child->probability * sqrtf(logf(node->playout_num_sum)) / (1 + child->playout_num);
+			ucb = float(child->win_num) / child->playout_num + CPUCT * child->probability * sqrtf(node->playout_num_sum) / (1 + child->playout_num);
 		}
 		else {
 			ucb = float(child->win_num) / child->playout_num + C * sqrtf(logf(node->playout_num_sum) / child->playout_num);
@@ -513,7 +513,7 @@ int UCTPattern::search_uct(Board& board, const Color color, UCTNode* node)
 	return win;
 }
 
-void UCTPattern::search_uct_root(Board& board, const Color color, UCTNode* node, const std::map<UCTNode*, UCTNode*>& copynodemap)
+void UCTPattern::search_uct_root(Board& board, const Color color, UCTNode* node, UCTNode* copychild)
 {
 	// UCBからプレイアウトする手を選択
 	// rootノードはアトミックに更新するためUCB計算ではロックしない
@@ -523,7 +523,7 @@ void UCTPattern::search_uct_root(Board& board, const Color color, UCTNode* node,
 	board.move_legal(selected_node->xy, color);
 
 	// コピーされたノードに変換
-	UCTNode* selected_node_copy = copynodemap.at(selected_node);
+	UCTNode* selected_node_copy = copychild + (selected_node - node->child);
 
 	int win;
 
@@ -574,23 +574,21 @@ XY UCTPattern::select_move(Board& board, Color color)
 	std::thread th[THREAD_NUM];
 	for (int th_i = 0; th_i < THREAD_NUM; th_i++)
 	{
-		th[th_i] = std::thread([root, board, color] {
-			// rootノードのコピー(子ノードのポインタと新たに作成したノードを対応付ける)
-			std::map<UCTNode*, UCTNode*> copynodemap;
-			UCTNode* copynode = create_child_node(root->child_num);
-			if (copynode == nullptr)
+		th[th_i] = std::thread([root, &board, color] {
+			// rootの子ノードのコピー
+			UCTNode* copychild = create_child_node(root->child_num);
+			if (copychild == nullptr)
 			{
 				fprintf(stderr, "node pool too small\n");
 				return;
 			}
+
 			for (int i = 0; i < root->child_num; i++)
 			{
-				copynode[i].xy = root->child[i].xy;
-				copynode[i].playout_num = 0;
-				copynode[i].playout_num_sum = 0;
-				copynode[i].child_num = 0;
-
-				copynodemap.insert({ root->child + i, copynode + i });
+				copychild[i].xy = root->child[i].xy;
+				copychild[i].playout_num = 0;
+				copychild[i].playout_num_sum = 0;
+				copychild[i].child_num = 0;
 			}
 
 			for (int i = 0; i < PLAYOUT_MAX / THREAD_NUM; i++)
@@ -599,7 +597,7 @@ XY UCTPattern::select_move(Board& board, Color color)
 				Board board_tmp = board;
 
 				// UCT
-				search_uct_root(board_tmp, color, root, copynodemap);
+				search_uct_root(board_tmp, color, root, copychild);
 			}
 		});
 	}
