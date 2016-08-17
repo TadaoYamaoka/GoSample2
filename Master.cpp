@@ -359,27 +359,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					XY xy = current_player->select_move(board_tmp, color);
 					DWORD elapseTime = GetTickCount() - startTime;
 
-					if (xy < 0)
+					if (xy >= 0)
 					{
-						break;
-					}
-					if (xy != PASS && board[xy] != EMPTY)
-					{
-						// 打ち直し
-						continue;
-					}
-
-					// 石を打つ
-					MoveResult err = board.move(xy, color, false);
-
-					if (err != SUCCESS)
-					{
-						if (typeid(*current_player) == typeid(Human))
+						if (xy != PASS && board[xy] != EMPTY)
 						{
 							// 打ち直し
 							continue;
 						}
-						break;
+
+						// 石を打つ
+						MoveResult err = board.move(xy, color, false);
+
+						if (err != SUCCESS)
+						{
+							if (typeid(*current_player) == typeid(Human))
+							{
+								// 打ち直し
+								continue;
+							}
+							break;
+						}
 					}
 
 					record[record_num++] = xy; // 棋譜追加
@@ -409,7 +408,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 					}
 					InvalidateRect(hWnd, NULL, FALSE);
 
-					if (xy == PASS && pre_xy == PASS)
+					if (xy == RESIGN || (xy == PASS && pre_xy == PASS))
 					{
 						// 終局
 						break;
@@ -472,6 +471,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		if (current_player && typeid(*current_player) == typeid(Human))
 		{
 			((Human*)current_player)->set_xy(PASS);
+			return 0;
+		}
+		break;
+	}
+	case WM_MBUTTONDOWN:
+	{
+		if (current_player && typeid(*current_player) == typeid(Human))
+		{
+			((Human*)current_player)->set_xy(RESIGN);
 			return 0;
 		}
 		break;
@@ -541,7 +549,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		if (record_num > 0)
 		{
 			XY xy = record[record_num - 1];
-			if (xy != PASS)
+			if (xy > 0)
 			{
 				int x = scaledX(MARGIN + GRID_WIDTH * (get_x(xy) - 0.5f));
 				int y = scaledY(MARGIN + GRID_WIDTH * (get_y(xy) - 0.5f));
@@ -549,7 +557,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				SelectObject(hDC, hPenLast);
 				Ellipse(hDC, x, y, x + GRID_WIDTH, y + GRID_WIDTH);
 			}
-			else {
+			else if (xy == PASS)
+			{
 				// PASS
 				SetTextColor(hDC, (record_num & 1) ? RGB(0, 0, 0) : RGB(255, 255, 255));
 				SetBkMode(hDC, TRANSPARENT);
@@ -557,6 +566,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				int drawX = scaledX(MARGIN + GRID_WIDTH * GRID_SIZE / 2);
 				int drawY = scaledY(MARGIN);
 				TextOut(hDC, drawX, drawY, L"PASS", 4);
+				SelectObject(hDC, hPrevFont);
+			}
+			else
+			{
+				// RESIGN
+				SetTextColor(hDC, (record_num & 1) ? RGB(0, 0, 0) : RGB(255, 255, 255));
+				SetBkMode(hDC, TRANSPARENT);
+				HFONT hPrevFont = (HFONT)SelectObject(hDC, hFontPass);
+				int drawX = scaledX(MARGIN + GRID_WIDTH * GRID_SIZE / 2);
+				int drawY = scaledY(MARGIN);
+				TextOut(hDC, drawX, drawY, L"RESIGN", 6);
 				SelectObject(hDC, hPrevFont);
 			}
 		}
@@ -747,21 +767,29 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
 			XY xy = current_player->select_move(board, color);
 			DWORD elapseTime = GetTickCount() - startTime;
 
-			MoveResult ret = board.move(xy, color, false);
-			while (ret != SUCCESS)
+			if (xy == RESIGN)
 			{
-				xy = current_player->select_move(board, color);
-				ret = board.move(xy, color, false);
+				printf("= resign\n\n");
+			}
+			else
+			{
+
+				MoveResult ret = board.move(xy, color, false);
+				while (ret != SUCCESS)
+				{
+					xy = current_player->select_move(board, color);
+					ret = board.move(xy, color, false);
+				}
+
+				if (xy == PASS)
+				{
+					printf("= pass\n\n");
+				}
+				else {
+					printf("= %c%d\n\n", gtp_axis_x[get_x(xy)], GRID_SIZE - get_y(xy) + 1);
+				}
 			}
 			record[record_num++] = xy; // 棋譜追加
-
-			if (xy == PASS)
-			{
-				printf("= pass\n\n");
-			}
-			else {
-				printf("= %c%d\n\n", gtp_axis_x[get_x(xy)], GRID_SIZE - get_y(xy) + 1);
-			}
 
 			// プレイアウト数と時間をログ出力
 			if (logfile)

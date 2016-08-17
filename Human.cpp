@@ -3,8 +3,8 @@
 
 XY Human::select_move(Board& board, Color color)
 {
-	xy = -1;
-	while (xy < 0)
+	xy = -2;
+	while (xy < -1)
 	{
 		Sleep(100);
 		// メッセージ処理
@@ -23,7 +23,7 @@ XY Human::select_move(Board& board, Color color)
 		}
 	}
 	XY ret = xy;
-	xy = -1;
+	xy = -2;
 	return ret;
 }
 

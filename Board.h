@@ -19,6 +19,7 @@ extern float KOMI;
 typedef short XY;
 
 const XY PASS = 0;
+const XY RESIGN = -1;
 
 extern XY DIR4[4];
 

@@ -356,7 +356,7 @@ XY UCTSaveAtari::select_move(Board& board, Color color)
 	}
 	if (rate_max == 0)
 	{
-		return PASS;
+		return RESIGN;
 	}
 
 	return best_move->xy;
