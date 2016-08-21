@@ -28,6 +28,7 @@ const Color EMPTY = 0;
 const Color BLACK = 1;
 const Color WHITE = 2;
 const Color OFFBOARD = 3;
+const size_t COLOR_MAX = WHITE + 1;
 
 typedef unsigned char GroupIndex;
 const GroupIndex G_NONE = 0xff;
@@ -166,7 +167,7 @@ public:
 	XY pre_xy[2];
 
 	// Î‚Ì”
-	int stone_num[3];
+	int stone_num[COLOR_MAX];
 
 	// ‘O‚Ìè‚Å•ÏX‚³‚ê‚½˜A
 	GroupIndex pre_changed_group[GROUP_SIZE_MAX / 2];

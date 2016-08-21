@@ -35,6 +35,9 @@ const int INFO_WIDTH = 120;
 const int CTRL_HEIGHT = 24;
 const int CTRL_MARGIN = 8;
 
+// アゲハマ
+int agehama[COLOR_MAX];
+
 HWND hMainWnd;
 DWORD style = WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX;
 
@@ -61,6 +64,21 @@ wchar_t* logfile;
 LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 DWORD WINAPI ThreadProc(LPVOID lpParameter);
 void print_sfg();
+
+MoveResult move(Board& board, const XY xy, Color color)
+{
+	int stone_num[3] = { 0, board.stone_num[BLACK], board.stone_num[WHITE] };
+	MoveResult ret = board.move(xy, color, false);
+	if (color == BLACK)
+	{
+		agehama[BLACK] += stone_num[WHITE] - board.stone_num[WHITE];
+	}
+	else
+	{
+		agehama[WHITE] += stone_num[BLACK] - board.stone_num[BLACK];
+	}
+	return ret;
+}
 
 #ifndef TEST
 int wmain(int argc, wchar_t* argv[]) {
@@ -262,6 +280,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	static HWND staticPlayers[2];
 	static HWND cmbPlayers[2];
 	static HWND btnStart;
+	static HWND staticAgehama;
 	const int BTN_ID_START = 0;
 	const int CMB_ID_PLAYER = 1;
 
@@ -315,6 +334,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			EnableWindow(btnStart, FALSE);
 		}
 
+		// アゲマハ
+		infoY += scaledY(CTRL_HEIGHT * 2 + CTRL_MARGIN * 2);
+		CreateWindow(WC_STATIC, L"Agehama", WS_CHILD | WS_VISIBLE, infoX, infoY, scaledX(INFO_WIDTH), scaledY(CTRL_HEIGHT), hWnd, NULL, hInstance, NULL);
+		infoY += scaledY(CTRL_HEIGHT);
+		staticAgehama = CreateWindow(WC_STATIC, L"", WS_CHILD | WS_VISIBLE, infoX, infoY, scaledX(INFO_WIDTH), scaledY(CTRL_HEIGHT), hWnd, NULL, hInstance, NULL);
+
 		return 0;
 	}
 	case WM_COMMAND:
@@ -344,6 +369,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				record_num = 0;
 				current_player = nullptr;
 				result_num = 0;
+				agehama[BLACK] = agehama[WHITE] = 0;
 
 				InvalidateRect(hWnd, NULL, FALSE);
 
@@ -368,7 +394,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 						}
 
 						// 石を打つ
-						MoveResult err = board.move(xy, color, false);
+						MoveResult err = move(board, xy, color);
 
 						if (err != SUCCESS)
 						{
@@ -606,6 +632,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			SelectObject(hDC, hPrevFont);
 		}
 
+		// アゲハマ
+		wchar_t strAgehama[16];
+		swprintf(strAgehama, L"B:%2d, W:%2d", agehama[BLACK], agehama[WHITE]);
+		SetWindowText(staticAgehama, strAgehama);
+
 		SelectObject(hDC, hPrevBrush);
 		SelectObject(hDC, hPrevPen);
 		EndPaint(hWnd, &ps);
@@ -717,6 +748,7 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
 		{
 			board.init(GRID_SIZE);
 			record_num = 0;
+			agehama[BLACK] = agehama[WHITE] = 0;
 			printf("= \n\n");
 		}
 		else if (strncmp(line, "komi", 4) == 0)
@@ -751,7 +783,7 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
 				xy = PASS;
 			}
 
-			board.move(xy, color, false);
+			move(board, xy, color);
 			record[record_num++] = xy; // 棋譜追加
 
 			printf("= \n\n");
@@ -774,11 +806,11 @@ DWORD WINAPI ThreadProc(LPVOID lpParameter)
 			else
 			{
 
-				MoveResult ret = board.move(xy, color, false);
+				MoveResult ret = move(board, xy, color);
 				while (ret != SUCCESS)
 				{
 					xy = current_player->select_move(board, color);
-					ret = board.move(xy, color, false);
+					ret = move(board, xy, color);
 				}
 
 				if (xy == PASS)
